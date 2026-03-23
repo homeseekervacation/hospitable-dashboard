@@ -211,6 +211,7 @@
   <div class="tab" data-page="financials">Financials</div>
   <div class="tab" data-page="grossprofit">Gross Profit</div>
   <div class="tab" data-page="targets">Targets</div>
+  <div class="tab" data-page="weekly">Weekly</div>
   <div class="tab" data-page="propview">Property View</div>
   <div class="tab" data-page="properties">Data</div>
   <div class="tab" data-page="occupancy">Occupancy</div>
@@ -428,6 +429,24 @@
       <button data-status="healthy">Healthy</button>
     </div>
     <div class="insights-grid" id="insightsGrid"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ WEEKLY TRACKER PAGE ══════════════════ -->
+<div class="page" id="page-weekly">
+  <div class="main">
+    <div class="card" style="padding:0;overflow:hidden">
+      <div style="padding:14px 20px;border-bottom:1px solid #2d3148;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+        <span style="font-size:0.82rem;font-weight:700;color:#e2e8f0;text-transform:uppercase;letter-spacing:0.5px">Weekly Revenue Tracker</span>
+        <span style="font-size:0.75rem;color:#6b7280">Cumulative monthly revenue per property, tracked week by week vs target. Green = at/above target · Red = $0 · Yellow = behind pace</span>
+      </div>
+      <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
+        <table id="wkTable" style="border-collapse:collapse;min-width:max-content;width:100%">
+          <thead id="wkHead" style="position:sticky;top:0;z-index:2"></thead>
+          <tbody id="wkBody"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -2080,6 +2099,226 @@ function tgtFilterClick(btn) {
   tgtRenderTable(btn.dataset.tgtFilter);
 }
 
+// ── Weekly Tracker ────────────────────────────────────────────────────────────
+function renderWeekly(data, yearFilter) {
+  const year = yearFilter === 'all' ? String(new Date().getFullYear()) : yearFilter;
+  const targets  = data.revenue_targets  || {};
+  const fees     = data.management_fees  || {};
+  const props    = data.properties;
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // Build revenue lookup: propId → dateStr → revenue
+  const revByPropDate = {};
+  data.reservations.forEach(r => {
+    if (!r.financials?.host?.revenue?.amount) return;
+    const dep = (r.departure_date || r.check_out || '');
+    if (!dep.startsWith(year)) return;
+    const pid = r.properties?.[0]?.id;
+    if (!pid) return;
+    const rev = r.financials.host.revenue.amount / 100;
+    if (!revByPropDate[pid]) revByPropDate[pid] = {};
+    revByPropDate[pid][dep] = (revByPropDate[pid][dep] || 0) + rev;
+  });
+
+  // Cumulative revenue for a property in a month up to a date (inclusive)
+  function cumRev(pid, mo, upTo) {
+    const moStr = `${year}-${String(mo).padStart(2,'0')}`;
+    return Object.entries(revByPropDate[pid] || {})
+      .filter(([d]) => d.startsWith(moStr) && d <= upTo)
+      .reduce((s, [, v]) => s + v, 0);
+  }
+
+  // Portfolio cumulative for a month up to a date
+  function portCumRev(mo, upTo) {
+    return props.reduce((s, p) => s + cumRev(p.id, mo, upTo), 0);
+  }
+
+  // Portfolio monthly target
+  function portTarget(mo) {
+    return props.reduce((s, p) => {
+      const t = (targets[p.id] || {})[mo];
+      return s + (t && !t.closed && t.revenue_target ? t.revenue_target : 0);
+    }, 0);
+  }
+
+  // Week reference dates within a month: day 7, 14, 21, 28, (last day if > 28)
+  function getWeekDates(mo) {
+    const dim = new Date(parseInt(year), mo, 0).getDate();
+    const dates = [];
+    [7, 14, 21, 28].forEach(d => {
+      if (d <= dim) dates.push(`${year}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
+    });
+    if (dim > 28) dates.push(`${year}-${String(mo).padStart(2,'0')}-${String(dim).padStart(2,'0')}`);
+    return dates;
+  }
+
+  // Active months: has target or has revenue
+  const activeMos = Array.from({length:12},(_,i)=>i+1).filter(mo => {
+    const moStr = `${year}-${String(mo).padStart(2,'0')}`;
+    const hasTgt = props.some(p => { const t=(targets[p.id]||{})[mo]; return t&&!t.closed&&t.revenue_target>0; });
+    const hasRev = props.some(p => Object.keys(revByPropDate[p.id]||{}).some(d=>d.startsWith(moStr)));
+    return hasTgt || hasRev;
+  });
+
+  // Sort props by year revenue descending
+  const sortedProps = [...props].sort((a,b) => {
+    const ra = Object.values(revByPropDate[a.id]||{}).reduce((s,v)=>s+v,0);
+    const rb = Object.values(revByPropDate[b.id]||{}).reduce((s,v)=>s+v,0);
+    return rb - ra;
+  });
+
+  const cellPad = 'padding:7px 10px';
+  const stickyLeft = 'position:sticky;left:0;z-index:1';
+
+  // ── Header row 1: month group labels ────────────────────────────────────────
+  let h1 = `<tr style="background:#0f1117">
+    <th style="${stickyLeft};background:#0f1117;min-width:175px;text-align:left;${cellPad}"></th>
+    <th style="background:#0f1117;${cellPad};white-space:nowrap;font-size:0.68rem;color:#6b7280">Mgmt%</th>
+    <th style="background:#0f1117;${cellPad};white-space:nowrap;font-size:0.68rem;color:#6b7280">Fee Tgt</th>`;
+  activeMos.forEach(mo => {
+    const wkDates = getWeekDates(mo);
+    h1 += `<th colspan="${1 + wkDates.length}" style="background:#0f1117;text-align:center;border-left:3px solid #3d4168;${cellPad};color:#a78bfa;font-size:0.8rem;font-weight:700">${MO[mo-1]} ${year}</th>`;
+  });
+  h1 += '</tr>';
+
+  // ── Header row 2: target + week date labels ──────────────────────────────────
+  let h2 = `<tr style="background:#141628">
+    <th style="${stickyLeft};background:#141628;text-align:left;${cellPad};font-size:0.7rem;color:#6b7280">Property</th>
+    <th style="background:#141628;${cellPad};font-size:0.68rem;color:#6b7280;text-align:right"></th>
+    <th style="background:#141628;${cellPad};font-size:0.68rem;color:#6b7280;text-align:right"></th>`;
+  activeMos.forEach(mo => {
+    const wkDates = getWeekDates(mo);
+    h2 += `<th class="num" style="background:#141628;border-left:3px solid #3d4168;${cellPad};color:#facc15;font-size:0.68rem;white-space:nowrap">Rev Target</th>`;
+    wkDates.forEach(dt => {
+      const d = parseInt(dt.slice(8,10));
+      const isFut = dt > todayStr;
+      h2 += `<th class="num" style="background:#141628;${cellPad};font-size:0.65rem;white-space:nowrap;color:${isFut?'#2d3148':'#6b7280'}">${MO[mo-1]} ${d}</th>`;
+    });
+  });
+  h2 += '</tr>';
+
+  // ── Portfolio row ────────────────────────────────────────────────────────────
+  let portRow = `<tr style="background:#252840;border-bottom:2px solid #3d4168;border-top:2px solid #3d4168">
+    <td style="${stickyLeft};background:#252840;${cellPad};font-size:0.82rem;font-weight:700;color:#a78bfa;white-space:nowrap">Portfolio Total</td>
+    <td style="${cellPad};color:#6b7280;font-size:0.75rem;text-align:right">—</td>
+    <td style="${cellPad};color:#6b7280;font-size:0.75rem;text-align:right">—</td>`;
+  activeMos.forEach(mo => {
+    const wkDates = getWeekDates(mo);
+    const tgt = portTarget(mo);
+    portRow += `<td class="num" style="border-left:3px solid #3d4168;${cellPad};color:#facc15;font-weight:700;font-size:0.8rem;white-space:nowrap">${tgt>0?fmt(tgt):'—'}</td>`;
+    wkDates.forEach(dt => {
+      const isFut = dt > todayStr;
+      const actual = portCumRev(mo, dt);
+      const pct = tgt>0 && actual>0 ? actual/tgt*100 : null;
+      const isCurrentWk = dt >= todayStr && (new Date(dt) - new Date(todayStr)) < 7*86400000;
+      let bg='', color='#e2e8f0';
+      if (isFut && actual===0) { color='#2d3148'; }
+      else if (actual===0) { bg='background:#3b1a1a;'; color='#f87171'; }
+      else if (pct!=null && pct>=100) { bg='background:#1e3a2f;'; color='#34d399'; }
+      else if (pct!=null && pct>=70) { color='#facc15'; }
+      else { color='#f87171'; }
+      const outline = isCurrentWk ? 'outline:2px solid #6366f1;outline-offset:-2px;' : '';
+      portRow += `<td class="num" style="${bg}${outline}${cellPad};white-space:nowrap">
+        <div style="font-size:0.8rem;font-weight:700;color:${color}">${isFut&&actual===0?'—':actual>0?fmtShort(actual):'$0'}</div>
+        ${pct!=null&&!isFut?`<div style="font-size:0.6rem;color:${color};margin-top:1px">${pct.toFixed(0)}%</div>`:''}
+      </td>`;
+    });
+  });
+  portRow += '</tr>';
+
+  // ── % to target row ──────────────────────────────────────────────────────────
+  let pctRow = `<tr style="background:#1a1d2e;border-bottom:2px solid #3d4168">
+    <td style="${stickyLeft};background:#1a1d2e;${cellPad};font-size:0.7rem;color:#6b7280;white-space:nowrap">% to Target</td>
+    <td></td><td></td>`;
+  activeMos.forEach(mo => {
+    const wkDates = getWeekDates(mo);
+    const tgt = portTarget(mo);
+    pctRow += `<td style="border-left:3px solid #3d4168"></td>`;
+    wkDates.forEach(dt => {
+      const isFut = dt > todayStr;
+      const actual = portCumRev(mo, dt);
+      const pct = tgt>0&&!isFut ? actual/tgt*100 : null;
+      const color = pct==null?'#2d3148':pct>=100?'#34d399':pct>=70?'#facc15':'#f87171';
+      const bg = pct!=null&&pct>=100?'background:#1e3a2f;':pct!=null&&pct<50?'background:#3b1a1a;':'';
+      pctRow += `<td class="num" style="${bg}${cellPad};font-size:0.72rem;color:${color};font-weight:700;white-space:nowrap">${pct!=null?pct.toFixed(0)+'%':'—'}</td>`;
+    });
+  });
+  pctRow += '</tr>';
+
+  // ── Property rows ────────────────────────────────────────────────────────────
+  let bodyHtml = portRow + pctRow;
+
+  sortedProps.forEach(p => {
+    const feePct = fees[p.id]?.value;
+    // Check if property has any data in this year
+    const hasAnyData = activeMos.some(mo => {
+      const t = (targets[p.id]||{})[mo];
+      const moStr = `${year}-${String(mo).padStart(2,'0')}`;
+      return (t&&!t.closed&&t.revenue_target>0) || Object.keys(revByPropDate[p.id]||{}).some(d=>d.startsWith(moStr));
+    });
+    if (!hasAnyData) return;
+
+    let row = `<tr style="border-bottom:1px solid #1e2035">
+      <td style="${stickyLeft};background:#1a1d2e;${cellPad};font-size:0.8rem;font-weight:600;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis">${p.name}</td>
+      <td class="num" style="${cellPad};color:#6b7280;font-size:0.75rem">${feePct!=null?feePct+'%':'—'}</td>`;
+
+    // Annual mgmt fee target (sum of monthly targets × fee %)
+    const annualMgmtFeeTarget = feePct ? activeMos.reduce((s,mo) => {
+      const t=(targets[p.id]||{})[mo];
+      return s+(t&&!t.closed&&t.revenue_target?t.revenue_target*(feePct/100):0);
+    },0) : 0;
+    row += `<td class="num" style="${cellPad};color:#a78bfa;font-size:0.75rem;white-space:nowrap">${annualMgmtFeeTarget>0?fmtShort(annualMgmtFeeTarget):'—'}</td>`;
+
+    activeMos.forEach(mo => {
+      const t = (targets[p.id]||{})[mo];
+      const target = t&&!t.closed ? (t.revenue_target||0) : 0;
+      const isClosed = t?.closed;
+      const wkDates = getWeekDates(mo);
+
+      // Target cell
+      row += `<td class="num" style="border-left:3px solid #3d4168;${cellPad};color:#facc15;font-weight:700;font-size:0.78rem;white-space:nowrap">${
+        target>0 ? fmt(target) : isClosed ? '<span style="color:#374151;font-size:0.7rem">Closed</span>' : '<span style="color:#374151">—</span>'
+      }</td>`;
+
+      // Week cells
+      wkDates.forEach(dt => {
+        const isFut = dt > todayStr;
+        const actual = cumRev(p.id, mo, dt);
+        const isCurrentWk = dt >= todayStr && (new Date(dt) - new Date(todayStr)) < 7*86400000;
+        let bg='', color='#e2e8f0', displayVal;
+
+        if (isClosed) {
+          color='#374151'; displayVal='Closed';
+        } else if (isFut && actual===0) {
+          color='#2d3148'; displayVal='—';
+        } else if (actual===0 && target>0) {
+          bg='background:#3b1a1a;'; color='#f87171'; displayVal='$0';
+        } else if (actual===0) {
+          color='#374151'; displayVal='—';
+        } else if (target>0 && actual>=target) {
+          bg='background:#1e3a2f;'; color='#34d399'; displayVal=fmt(actual);
+        } else if (target>0 && actual >= target*0.7) {
+          color='#facc15'; displayVal=fmt(actual);
+        } else if (target>0) {
+          color='#f87171'; displayVal=fmt(actual);
+        } else {
+          color='#9ca3af'; displayVal=fmt(actual);
+        }
+
+        const outline = isCurrentWk ? 'outline:2px solid #6366f1;outline-offset:-2px;' : '';
+        row += `<td class="num" style="${bg}${outline}${cellPad};font-size:0.78rem;color:${color};white-space:nowrap;font-weight:${actual>0?'600':'400'}">${displayVal}</td>`;
+      });
+    });
+
+    row += '</tr>';
+    bodyHtml += row;
+  });
+
+  document.getElementById('wkHead').innerHTML = h1 + h2;
+  document.getElementById('wkBody').innerHTML = bodyHtml;
+}
+
 // ── Main render dispatch ─────────────────────────────────────────────────────
 function renderAll() {
   const year = document.getElementById('yearFilter').value;
@@ -2094,6 +2333,7 @@ function renderAll() {
   renderGrossProfit(rawData, year, prop, plat);
   renderPropertyList(rawData, year);
   renderTargets(rawData, year);
+  renderWeekly(rawData, year);
 }
 
 // ── Init ─────────────────────────────────────────────────────────────────────
