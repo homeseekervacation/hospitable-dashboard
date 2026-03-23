@@ -1,0 +1,2147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Portfolio Dashboard — Hospitable × PriceLabs</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0f1117; color: #e2e8f0; min-height: 100vh; }
+
+  header { background: #1a1d2e; border-bottom: 1px solid #2d3148; padding: 18px 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+  header h1 { font-size: 1.4rem; font-weight: 700; color: #fff; letter-spacing: -0.3px; }
+  header span { font-size: 0.8rem; color: #6b7280; }
+
+  .filters { background: #1a1d2e; border-bottom: 1px solid #2d3148; padding: 14px 32px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+  .filter-group { display: flex; align-items: center; gap: 8px; }
+  label { font-size: 0.8rem; color: #9ca3af; font-weight: 500; }
+  select { background: #252840; border: 1px solid #3d4168; color: #e2e8f0; padding: 6px 12px; border-radius: 6px; font-size: 0.85rem; cursor: pointer; }
+  select:focus { outline: none; border-color: #6366f1; }
+
+  .tabs { background: #1a1d2e; border-bottom: 1px solid #2d3148; padding: 0 32px; display: flex; gap: 0; }
+  .tab { padding: 12px 20px; font-size: 0.85rem; font-weight: 500; color: #6b7280; cursor: pointer; border-bottom: 2px solid transparent; transition: all 0.15s; }
+  .tab:hover { color: #e2e8f0; }
+  .tab.active { color: #6366f1; border-bottom-color: #6366f1; }
+
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .main { padding: 24px 32px; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; margin-bottom: 22px; }
+  .kpi { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 18px; }
+  .kpi .label { font-size: 0.72rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+  .kpi .value { font-size: 1.6rem; font-weight: 700; color: #fff; line-height: 1; }
+  .kpi .sub { font-size: 0.75rem; color: #6b7280; margin-top: 5px; }
+  .kpi.green .value { color: #34d399; }
+  .kpi.blue .value { color: #60a5fa; }
+  .kpi.purple .value { color: #a78bfa; }
+  .kpi.orange .value { color: #fb923c; }
+  .kpi.teal .value { color: #2dd4bf; }
+
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+  .charts-row.full { grid-template-columns: 1fr; }
+  .charts-row.thirds { grid-template-columns: 1fr 1fr 1fr; }
+  .card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 20px; margin-bottom: 0; }
+  .card.mb { margin-bottom: 20px; }
+  .card h2 { font-size: 0.82rem; font-weight: 600; color: #6b7280; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  thead th { text-align: left; padding: 9px 11px; color: #6b7280; font-weight: 600; text-transform: uppercase; font-size: 0.7rem; letter-spacing: 0.5px; border-bottom: 1px solid #2d3148; white-space: nowrap; cursor: pointer; user-select: none; }
+  thead th:hover { color: #9ca3af; }
+  tbody tr { border-bottom: 1px solid #1a1d30; transition: background 0.12s; }
+  tbody tr:hover { background: #21243d; }
+  tbody td { padding: 9px 11px; color: #e2e8f0; white-space: nowrap; }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .positive { color: #34d399; }
+  .negative { color: #f87171; }
+  .muted { color: #6b7280; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 0.68rem; font-weight: 600; }
+  .pill.top { background: #1e3a2f; color: #34d399; }
+  .pill.warn { background: #3b2a1a; color: #fb923c; }
+
+  /* Occupancy bars */
+  .occ-bar-wrap { display: flex; align-items: center; gap: 6px; }
+  .occ-bar-bg { flex: 1; height: 6px; background: #2d3148; border-radius: 3px; overflow: hidden; min-width: 60px; }
+  .occ-bar-fill { height: 100%; border-radius: 3px; }
+  .occ-label { font-size: 0.75rem; width: 36px; text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* MPI badge */
+  .mpi { display: inline-block; padding: 2px 7px; border-radius: 8px; font-size: 0.72rem; font-weight: 700; }
+  .mpi.high { background: #1e3a2f; color: #34d399; }
+  .mpi.mid { background: #2a2a1a; color: #facc15; }
+  .mpi.low { background: #3b1a1a; color: #f87171; }
+
+  .section-title { font-size: 0.95rem; font-weight: 700; color: #e2e8f0; margin-bottom: 16px; margin-top: 4px; }
+
+  /* Insights */
+  .insights-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+  .insight-card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 18px; border-left: 4px solid #2d3148; }
+  .insight-card.healthy { border-left-color: #34d399; }
+  .insight-card.monitor { border-left-color: #facc15; }
+  .insight-card.action  { border-left-color: #f87171; }
+  .insight-card .ic-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
+  .insight-card .ic-name { font-size: 0.9rem; font-weight: 700; color: #e2e8f0; }
+  .badge { padding: 3px 9px; border-radius: 10px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; white-space: nowrap; }
+  .badge.healthy { background: #1e3a2f; color: #34d399; }
+  .badge.monitor { background: #2a2a1a; color: #facc15; }
+  .badge.action  { background: #3b1a1a; color: #f87171; }
+  .ic-metrics { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+  .ic-metric { text-align: center; }
+  .ic-metric .m-val { font-size: 1.05rem; font-weight: 700; color: #e2e8f0; }
+  .ic-metric .m-lbl { font-size: 0.65rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 1px; }
+  .ic-metric .m-val.up { color: #34d399; }
+  .ic-metric .m-val.down { color: #f87171; }
+  .ic-metric .m-val.warn { color: #facc15; }
+  .ic-divider { border: none; border-top: 1px solid #2d3148; margin: 10px 0; }
+  .ic-recs { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .ic-recs li { font-size: 0.78rem; color: #9ca3af; padding-left: 14px; position: relative; line-height: 1.4; }
+  .ic-recs li::before { content: '›'; position: absolute; left: 0; color: #6366f1; font-weight: 700; }
+  .ic-recs li.positive::before { color: #34d399; }
+  .ic-recs li.warning::before { color: #facc15; }
+  .ic-recs li.urgent::before  { color: #f87171; }
+  .insights-filter { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .insights-filter button { padding: 5px 14px; border-radius: 16px; border: 1px solid #2d3148; background: #252840; color: #9ca3af; font-size: 0.78rem; cursor: pointer; }
+  .insights-filter button.active { background: #6366f1; border-color: #6366f1; color: #fff; }
+
+  /* Targets */
+  .tgt-filter-btn { padding: 5px 14px; border-radius: 16px; border: 1px solid #2d3148; background: #252840; color: #9ca3af; font-size: 0.78rem; cursor: pointer; transition: all 0.15s; }
+  .tgt-filter-btn.active { background: #6366f1; border-color: #6366f1; color: #fff; }
+  .tgt-pill { display: inline-block; padding: 2px 9px; border-radius: 10px; font-size: 0.68rem; font-weight: 700; white-space: nowrap; }
+  .tgt-pill.ahead  { background: #1e3a2f; color: #34d399; }
+  .tgt-pill.behind { background: #3b1a1a; color: #f87171; }
+  .tgt-pill.closed { background: #1e2030; color: #6b7280; }
+  .tgt-pill.no-tgt { background: #252840; color: #9ca3af; }
+
+  /* Property View */
+  .pv-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .pv-card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 16px; cursor: pointer; transition: border-color 0.15s, transform 0.1s; border-left: 4px solid #2d3148; }
+  .pv-card:hover { border-color: #6366f1; transform: translateY(-2px); }
+  .pv-card.healthy { border-left-color: #34d399; }
+  .pv-card.monitor { border-left-color: #facc15; }
+  .pv-card.action  { border-left-color: #f87171; }
+  .pv-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px; gap: 8px; }
+  .pv-card-name { font-size: 0.88rem; font-weight: 700; color: #e2e8f0; line-height: 1.3; }
+  .pv-card-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .pv-stat .sv { font-size: 0.95rem; font-weight: 700; color: #fff; }
+  .pv-stat .sl { font-size: 0.62rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.3px; margin-top: 2px; }
+  .pv-search-row { margin-bottom: 16px; }
+  .pv-search-row input { background: #1a1d2e; border: 1px solid #3d4168; color: #e2e8f0; padding: 8px 14px; border-radius: 8px; font-size: 0.85rem; width: 280px; }
+  .pv-search-row input:focus { outline: none; border-color: #6366f1; }
+  .pv-back-bar { background: #1a1d2e; border-bottom: 1px solid #2d3148; padding: 12px 32px; display: flex; align-items: center; gap: 20px; }
+  .pv-back-bar button { background: #252840; border: 1px solid #3d4168; color: #9ca3af; padding: 6px 14px; border-radius: 6px; cursor: pointer; font-size: 0.82rem; }
+  .pv-back-bar button:hover { color: #e2e8f0; border-color: #6366f1; }
+  .pv-detail-title { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+  .pv-detail-title span:first-child { font-size: 1.1rem; font-weight: 700; color: #fff; }
+  .pv-section { margin-bottom: 28px; }
+  .pv-section-title { font-size: 0.95rem; font-weight: 700; color: #a78bfa; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid #2d3148; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Overview */
+  .ov-target-card { background: #1a1d2e; border: 1px solid #2d3148; border-radius: 10px; padding: 20px 24px; margin-bottom: 20px; }
+  .ov-target-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+  .ov-target-title { font-size: 0.72rem; color: #6b7280; text-transform: uppercase; letter-spacing: 0.5px; }
+  .ov-target-nums { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  .ov-target-actual { font-size: 1.8rem; font-weight: 700; color: #34d399; }
+  .ov-target-goal { font-size: 1rem; color: #6b7280; }
+  .ov-target-pct { font-size: 1.1rem; font-weight: 700; color: #a78bfa; }
+  .ov-progress-track { height: 10px; background: #2d3148; border-radius: 5px; overflow: hidden; }
+  .ov-progress-fill { height: 100%; border-radius: 5px; background: linear-gradient(90deg, #6366f1, #34d399); transition: width 0.6s ease; }
+  .ov-progress-meta { display: flex; justify-content: space-between; margin-top: 8px; font-size: 0.75rem; color: #6b7280; }
+  .ov-status-strip { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+  .ov-status-tile { border-radius: 10px; padding: 16px 18px; cursor: pointer; transition: opacity 0.15s; }
+  .ov-status-tile:hover { opacity: 0.85; }
+  .ov-status-tile.action  { background: #2a1212; border: 1px solid #7f1d1d; }
+  .ov-status-tile.monitor { background: #1e1a10; border: 1px solid #713f12; }
+  .ov-status-tile.healthy { background: #0f2320; border: 1px solid #14532d; }
+  .ov-status-tile .st-count { font-size: 2.2rem; font-weight: 800; line-height: 1; }
+  .ov-status-tile.action  .st-count { color: #f87171; }
+  .ov-status-tile.monitor .st-count { color: #facc15; }
+  .ov-status-tile.healthy .st-count { color: #34d399; }
+  .ov-status-tile .st-label { font-size: 0.72rem; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; }
+  .ov-attn-table table { font-size: 0.81rem; }
+  .ov-attn-table .rec-text { max-width: 340px; white-space: normal; line-height: 1.35; color: #9ca3af; font-size: 0.78rem; }
+  .ov-attn-table tr { cursor: pointer; }
+  .ov-attn-table tr:hover td { background: #1e2140; }
+  .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; flex-shrink: 0; }
+  .status-dot.action  { background: #f87171; }
+  .status-dot.monitor { background: #facc15; }
+  .status-dot.healthy { background: #34d399; }
+
+  @media (max-width: 900px) {
+    .charts-row, .charts-row.thirds { grid-template-columns: 1fr; }
+    .main { padding: 14px 16px; }
+    .filters, .tabs { padding-left: 16px; padding-right: 16px; }
+    header { padding: 14px 16px; }
+    .ov-status-strip { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Portfolio Dashboard</h1>
+  <span id="fetched-at"></span>
+</header>
+
+<div class="filters">
+  <div class="filter-group">
+    <label>Year</label>
+    <select id="yearFilter">
+      <option value="all">All Years</option>
+      <option value="2024">2024</option>
+      <option value="2025">2025</option>
+      <option value="2026">2026</option>
+    </select>
+  </div>
+  <div class="filter-group">
+    <label>Property</label>
+    <select id="propertyFilter"><option value="all">All Properties</option></select>
+  </div>
+  <div class="filter-group">
+    <label>Platform</label>
+    <select id="platformFilter"><option value="all">All Platforms</option></select>
+  </div>
+</div>
+
+<div class="tabs">
+  <div class="tab active" data-page="overview">Overview</div>
+  <div class="tab" data-page="insights">Properties</div>
+  <div class="tab" data-page="financials">Financials</div>
+  <div class="tab" data-page="grossprofit">Gross Profit</div>
+  <div class="tab" data-page="targets">Targets</div>
+  <div class="tab" data-page="propview">Property View</div>
+  <div class="tab" data-page="properties">Data</div>
+  <div class="tab" data-page="occupancy">Occupancy</div>
+</div>
+
+<!-- ═══════════════════════ OVERVIEW PAGE ════════════════════════ -->
+<div class="page active" id="page-overview">
+  <div class="main">
+    <!-- Annual target progress -->
+    <div class="ov-target-card" id="ov-target-card">
+      <div class="ov-target-header">
+        <span class="ov-target-title">Annual Revenue Target</span>
+        <div class="ov-target-nums">
+          <span class="ov-target-actual" id="ov-actual">—</span>
+          <span class="ov-target-goal" id="ov-goal">of —</span>
+          <span class="ov-target-pct" id="ov-pct">—%</span>
+        </div>
+      </div>
+      <div class="ov-progress-track"><div class="ov-progress-fill" id="ov-progress-fill" style="width:0%"></div></div>
+      <div class="ov-progress-meta">
+        <span id="ov-progress-left">—</span>
+        <span id="ov-progress-right">—</span>
+      </div>
+    </div>
+
+    <!-- Portfolio KPIs -->
+    <div class="kpi-grid" id="ov-kpi-grid" style="margin-bottom:20px"></div>
+
+    <!-- Status summary + charts -->
+    <div class="charts-row" style="margin-bottom:20px">
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="ov-status-strip" id="ov-status-strip">
+          <div class="ov-status-tile action" onclick="ovJumpToStatus('action')">
+            <div class="st-count" id="ov-count-action">—</div>
+            <div class="st-label">Action Required</div>
+          </div>
+          <div class="ov-status-tile monitor" onclick="ovJumpToStatus('monitor')">
+            <div class="st-count" id="ov-count-monitor">—</div>
+            <div class="st-label">Monitor</div>
+          </div>
+          <div class="ov-status-tile healthy" onclick="ovJumpToStatus('healthy')">
+            <div class="st-count" id="ov-count-healthy">—</div>
+            <div class="st-label">Healthy</div>
+          </div>
+        </div>
+        <div class="card" style="flex:1">
+          <h2>Revenue by Platform</h2>
+          <canvas id="ovPlatformChart" height="180"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h2>Monthly Revenue vs Projected</h2>
+        <canvas id="ovMonthlyChart" height="280"></canvas>
+      </div>
+    </div>
+
+    <!-- Properties needing attention -->
+    <div class="card ov-attn-table">
+      <h2 style="margin-bottom:14px">Properties Needing Attention <span id="ov-attn-count" style="color:#6b7280;font-weight:400"></span></h2>
+      <div class="table-wrap">
+        <table id="ovAttnTable">
+          <thead>
+            <tr>
+              <th>Property</th>
+              <th>Status</th>
+              <th class="num">Occ 30d</th>
+              <th class="num">vs Market</th>
+              <th class="num">MPI</th>
+              <th class="num">YoY Rev</th>
+              <th class="num">Bookings 30d</th>
+              <th>Top Recommendation</th>
+            </tr>
+          </thead>
+          <tbody id="ovAttnBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ FINANCIALS PAGE ═══════════════════════ -->
+<div class="page" id="page-financials">
+  <div class="main">
+    <div class="kpi-grid">
+      <div class="kpi green"><div class="label">Total Revenue</div><div class="value" id="kpi-revenue">—</div><div class="sub">Host net revenue</div></div>
+      <div class="kpi blue"><div class="label">Bookings</div><div class="value" id="kpi-bookings">—</div><div class="sub">Accepted reservations</div></div>
+      <div class="kpi purple"><div class="label">Total Nights</div><div class="value" id="kpi-nights">—</div><div class="sub">Nights booked</div></div>
+      <div class="kpi orange"><div class="label">Avg Nightly Rate</div><div class="value" id="kpi-anr">—</div><div class="sub">Revenue ÷ nights</div></div>
+      <div class="kpi"><div class="label">Avg Booking Value</div><div class="value" id="kpi-abv">—</div><div class="sub">Revenue ÷ bookings</div></div>
+      <div class="kpi teal"><div class="label">Active Properties</div><div class="value" id="kpi-props">—</div><div class="sub">With accepted bookings</div></div>
+    </div>
+
+    <div class="charts-row">
+      <div class="card">
+        <h2>Monthly Revenue vs Projected</h2>
+        <canvas id="monthlyChart" height="210"></canvas>
+      </div>
+      <div class="card">
+        <h2>Revenue by Property (Top 15)</h2>
+        <canvas id="propertyChart" height="210"></canvas>
+      </div>
+    </div>
+
+    <div class="charts-row full">
+      <div class="card">
+        <h2>Actual vs Projected Revenue by Property</h2>
+        <canvas id="propVsProjectedChart" height="120"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ OCCUPANCY PAGE ════════════════════════ -->
+<div class="page" id="page-occupancy">
+  <div class="main">
+    <div class="kpi-grid" id="occ-kpis">
+      <div class="kpi blue"><div class="label">Avg Occ Next 30d</div><div class="value" id="kpi-occ30">—</div><div class="sub" id="kpi-occ30-vs">vs market</div></div>
+      <div class="kpi"><div class="label">Market Occ Next 30d</div><div class="value" id="kpi-mocc30">—</div><div class="sub">PriceLabs market</div></div>
+      <div class="kpi orange"><div class="label">Avg Occ Next 60d</div><div class="value" id="kpi-occ60">—</div><div class="sub" id="kpi-occ60-vs">vs market</div></div>
+      <div class="kpi"><div class="label">Market Occ Next 60d</div><div class="value" id="kpi-mocc60">—</div><div class="sub">PriceLabs market</div></div>
+      <div class="kpi teal"><div class="label">Avg Occ Next 90d</div><div class="value" id="kpi-occ90">—</div><div class="sub" id="kpi-occ90-vs">vs market</div></div>
+      <div class="kpi"><div class="label">Market Occ Next 90d</div><div class="value" id="kpi-mocc90">—</div><div class="sub">PriceLabs market</div></div>
+      <div class="kpi purple"><div class="label">Avg Base Price</div><div class="value" id="kpi-base">—</div><div class="sub">PriceLabs base rate</div></div>
+      <div class="kpi green"><div class="label">Avg Nightly (Actual)</div><div class="value" id="kpi-actual-anr">—</div><div class="sub">From bookings</div></div>
+    </div>
+
+    <div class="charts-row full">
+      <div class="card">
+        <h2>30-Day Occupancy vs Market — All Properties</h2>
+        <canvas id="occChart30" height="130"></canvas>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="card">
+        <h2>60 &amp; 90-Day Occupancy vs Market</h2>
+        <canvas id="occOutlookChart" height="230"></canvas>
+      </div>
+      <div class="card">
+        <h2>Pricing Overview — Min / Base / Actual ANR / Max</h2>
+        <canvas id="priceOverviewChart" height="230"></canvas>
+      </div>
+    </div>
+
+    <div class="card mb">
+      <h2>Market Performance Index (MPI) — Next 30 Days</h2>
+      <canvas id="mpiChart" height="110"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ GROSS PROFIT PAGE ════════════════════ -->
+<div class="page" id="page-grossprofit">
+  <div class="main">
+    <div class="kpi-grid">
+      <div class="kpi green"><div class="label">Mgmt Fee Earned</div><div class="value" id="kpi-gp-mgmt">—</div><div class="sub">Your gross income</div></div>
+      <div class="kpi blue"><div class="label">Owner Payout</div><div class="value" id="kpi-gp-owner">—</div><div class="sub">After your fee</div></div>
+      <div class="kpi purple"><div class="label">Avg Gross Margin</div><div class="value" id="kpi-gp-margin">—</div><div class="sub">Weighted avg fee %</div></div>
+      <div class="kpi orange"><div class="label">Avg Fee / Booking</div><div class="value" id="kpi-gp-per-booking">—</div><div class="sub">Mgmt fee ÷ bookings</div></div>
+      <div class="kpi teal"><div class="label">HST Collected</div><div class="value" id="kpi-gp-hst">—</div><div class="sub">13% on mgmt fee</div></div>
+      <div class="kpi"><div class="label">Cleaning Fees</div><div class="value" id="kpi-gp-cleaning">—</div><div class="sub">Passed to owners</div></div>
+    </div>
+
+    <div class="charts-row full">
+      <div class="card">
+        <h2>Monthly: Mgmt Fee Earned vs Owner Payout (Stacked)</h2>
+        <canvas id="gpMonthlyChart" height="140"></canvas>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="card">
+        <h2>Mgmt Fee Earned by Property</h2>
+        <canvas id="gpPropertyChart" height="230"></canvas>
+      </div>
+      <div class="card">
+        <h2>Gross Margin % by Property</h2>
+        <canvas id="gpMarginChart" height="230"></canvas>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px">
+      <h2>Monthly Gross Profit Breakdown</h2>
+      <div class="table-wrap">
+        <table id="gpMonthlyTable">
+          <thead>
+            <tr>
+              <th>Month</th>
+              <th class="num">Revenue</th>
+              <th class="num">Cleaning Fees</th>
+              <th class="num">Mgmt Fee</th>
+              <th class="num">HST (13%)</th>
+              <th class="num">Owner Payout</th>
+              <th class="num">Margin %</th>
+              <th class="num">Bookings</th>
+              <th class="num">Nights</th>
+              <th class="num">Avg Nightly</th>
+            </tr>
+          </thead>
+          <tbody id="gpMonthlyTableBody"></tbody>
+          <tfoot id="gpMonthlyTableFoot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ INSIGHTS PAGE ════════════════════════ -->
+<div class="page" id="page-insights">
+  <div class="main">
+    <div class="insights-filter">
+      <button class="active" data-status="all">All Properties</button>
+      <button data-status="action">Action Required</button>
+      <button data-status="monitor">Monitor</button>
+      <button data-status="healthy">Healthy</button>
+    </div>
+    <div class="insights-grid" id="insightsGrid"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ PROPERTY VIEW PAGE ═══════════════════ -->
+<div class="page" id="page-propview">
+  <!-- List view -->
+  <div id="pv-list">
+    <div class="main">
+      <div class="pv-search-row">
+        <input type="text" id="pvSearch" placeholder="Search properties…" />
+      </div>
+      <div class="pv-grid" id="pvGrid"></div>
+    </div>
+  </div>
+  <!-- Detail view -->
+  <div id="pv-detail" style="display:none">
+    <div class="pv-back-bar">
+      <button id="pvBack">← All Properties</button>
+      <div class="pv-detail-title">
+        <span id="pv-detail-name"></span>
+        <span id="pv-detail-badge" class="badge"></span>
+      </div>
+    </div>
+    <div class="main">
+      <!-- Financial Summary -->
+      <div class="pv-section">
+        <div class="pv-section-title">Financial Summary</div>
+        <div class="kpi-grid" id="pv-fin-kpis"></div>
+        <div class="charts-row">
+          <div class="card"><h2>Monthly Revenue</h2><canvas id="pdMonthlyChart" height="200"></canvas></div>
+          <div class="card"><h2>Revenue by Year</h2><canvas id="pdYoyChart" height="200"></canvas></div>
+        </div>
+      </div>
+      <!-- Occupancy & Pricing -->
+      <div class="pv-section">
+        <div class="pv-section-title">Occupancy &amp; Pricing</div>
+        <div class="kpi-grid" id="pv-occ-kpis"></div>
+        <div class="charts-row">
+          <div class="card"><h2>Occupancy vs Market (30 / 60 / 90d)</h2><canvas id="pdOccChart" height="200"></canvas></div>
+          <div class="card"><h2>Price Comparison</h2><canvas id="pdPriceChart" height="200"></canvas></div>
+        </div>
+      </div>
+      <!-- Gross Profit -->
+      <div class="pv-section">
+        <div class="pv-section-title">Gross Profit</div>
+        <div class="kpi-grid" id="pv-gp-kpis"></div>
+        <div class="charts-row full">
+          <div class="card"><h2>Monthly: Mgmt Fee vs Owner Payout</h2><canvas id="pdGpChart" height="140"></canvas></div>
+        </div>
+      </div>
+      <!-- Insights -->
+      <div class="pv-section">
+        <div class="pv-section-title">Insights &amp; Recommendations</div>
+        <div id="pv-insight-card"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════ PROPERTIES PAGE ══════════════════════ -->
+<div class="page" id="page-properties">
+  <div class="main">
+    <div class="card mb">
+      <h2>Property Performance</h2>
+      <div class="table-wrap">
+        <table id="propTableEl">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Property</th>
+              <th class="num">Bookings</th>
+              <th class="num">Nights</th>
+              <th class="num">Avg Nightly</th>
+              <th class="num">Avg Booking</th>
+              <th class="num">Net Revenue</th>
+              <th class="num">% Share</th>
+              <th class="num">PL Base</th>
+              <th class="num">PL Min</th>
+              <th class="num">PL Max</th>
+              <th class="num">Occ 30d</th>
+              <th class="num">Mkt 30d</th>
+              <th class="num">Occ 60d</th>
+              <th class="num">Mkt 60d</th>
+              <th class="num">Occ 90d</th>
+              <th class="num">Mkt 90d</th>
+              <th class="num">MPI 30d</th>
+              <th class="num">Mgmt %</th>
+              <th class="num">Mgmt Fee</th>
+              <th class="num">Owner Payout</th>
+            </tr>
+          </thead>
+          <tbody id="propTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════ TARGETS PAGE ═════════════════════════ -->
+<div class="page" id="page-targets">
+  <div class="main">
+    <!-- KPI summary row -->
+    <div class="kpi-grid" id="tgt-kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:22px"></div>
+
+    <!-- Portfolio chart: actual vs target bars per month -->
+    <div class="card mb">
+      <h2>Portfolio Revenue — Actual vs Projected vs Annual Target</h2>
+      <canvas id="tgtPortfolioChart" height="90"></canvas>
+    </div>
+
+    <!-- Per-property per-month table -->
+    <div class="card">
+      <h2>Property × Month — Target Tracker</h2>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        <button class="tgt-filter-btn active" data-tgt-filter="all" onclick="tgtFilterClick(this)">All</button>
+        <button class="tgt-filter-btn" data-tgt-filter="behind" onclick="tgtFilterClick(this)">Behind Target</button>
+        <button class="tgt-filter-btn" data-tgt-filter="ahead" onclick="tgtFilterClick(this)">Ahead of Target</button>
+        <button class="tgt-filter-btn" data-tgt-filter="closed" onclick="tgtFilterClick(this)">Closed</button>
+      </div>
+      <div class="table-wrap">
+        <table id="tgtTableEl">
+          <thead>
+            <tr>
+              <th>Property</th>
+              <th>Month</th>
+              <th class="num">Actual Rev</th>
+              <th class="num">Projected Rev</th>
+              <th class="num">Var $</th>
+              <th class="num">Var %</th>
+              <th class="num">Actual Occ</th>
+              <th class="num">Projected Occ</th>
+              <th class="num">Occ Var</th>
+              <th class="num">2025 Rev</th>
+              <th class="num">YoY $</th>
+              <th class="num">YoY %</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="tgtTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Helpers ──────────────────────────────────────────────────────────────────
+const fmt = n => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'CAD', maximumFractionDigits: 0 }).format(n);
+const fmtShort = n => n >= 1000000 ? '$' + (n/1000000).toFixed(1) + 'M' : n >= 1000 ? '$' + (n/1000).toFixed(0) + 'K' : fmt(n);
+const pct = s => { if (!s) return null; const v = parseFloat(s); return isNaN(v) ? null : v; };
+
+const COLORS = [
+  '#6366f1','#34d399','#f59e0b','#60a5fa','#f472b6',
+  '#a78bfa','#fb923c','#2dd4bf','#facc15','#4ade80',
+  '#38bdf8','#e879f9','#f87171','#c084fc','#86efac',
+  '#fdba74','#67e8f9','#fde047','#a3e635','#fb7185',
+];
+
+let charts = {};
+let rawData = null;
+
+function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+function getPropertyName(res) {
+  const arr = res.properties;
+  return arr && arr.length ? arr[0].name || 'Unknown' : 'Unknown';
+}
+
+// ── Process financials ───────────────────────────────────────────────────────
+function processFinancials(data, yearFilter, propFilter, platFilter, asOf = null) {
+  let reservations = data.reservations.filter(r => {
+    const fin = r.financials;
+    return fin && fin.host?.revenue?.amount > 0;
+  });
+  if (yearFilter !== 'all') reservations = reservations.filter(r => (r.departure_date || r.check_out || '').startsWith(yearFilter));
+  if (propFilter !== 'all') reservations = reservations.filter(r => r.properties?.[0]?.id === propFilter);
+  if (platFilter !== 'all') reservations = reservations.filter(r => r.platform === platFilter);
+  if (asOf) reservations = reservations.filter(r => (r.departure_date || r.check_out || '').slice(0,10) <= asOf);
+
+  const byMonth = {}, byProp = {}, byPlatform = {}, byPropMonth = {};
+
+  reservations.forEach(r => {
+    const fin = r.financials;
+    const revenue = (fin.host?.revenue?.amount || 0) / 100;
+    const accommodation = (fin.host?.accommodation?.amount || 0) / 100;
+    const hostFees = (fin.host?.host_fees || []).reduce((s, f) => s + f.amount, 0) / 100;
+    const cleaningFee = (fin.host?.guest_fees || []).filter(f => /cleaning fee/i.test(f.label || '')).reduce((s, f) => s + (f.amount || 0), 0) / 100;
+    const nights = r.nights || 0;
+    const date = (r.departure_date || r.check_out || '').substring(0, 7);
+    const propId = r.properties?.[0]?.id || 'unknown';
+    const propName = getPropertyName(r);
+    const platform = r.platform || 'unknown';
+
+    if (!byMonth[date]) byMonth[date] = { revenue: 0, bookings: 0, nights: 0 };
+    byMonth[date].revenue += revenue;
+    byMonth[date].bookings++;
+    byMonth[date].nights += nights;
+
+    if (!byProp[propId]) byProp[propId] = { name: propName, revenue: 0, bookings: 0, nights: 0, accommodation: 0, hostFees: 0, cleaningFee: 0 };
+    byProp[propId].revenue += revenue;
+    byProp[propId].bookings++;
+    byProp[propId].nights += nights;
+    byProp[propId].accommodation += accommodation;
+    byProp[propId].hostFees += hostFees;
+    byProp[propId].cleaningFee += cleaningFee;
+
+    if (!byPlatform[platform]) byPlatform[platform] = 0;
+    byPlatform[platform] += revenue;
+
+    if (!byPropMonth[propId]) byPropMonth[propId] = { name: propName };
+    if (!byPropMonth[propId][date]) byPropMonth[propId][date] = { revenue: 0, bookings: 0, nights: 0, accommodation: 0, hostFees: 0, cleaningFee: 0 };
+    byPropMonth[propId][date].revenue += revenue;
+    byPropMonth[propId][date].bookings++;
+    byPropMonth[propId][date].nights += nights;
+    byPropMonth[propId][date].accommodation += accommodation;
+    byPropMonth[propId][date].hostFees += hostFees;
+    byPropMonth[propId][date].cleaningFee += cleaningFee;
+  });
+
+  return { byMonth, byProp, byPlatform, byPropMonth, total: reservations.length };
+}
+
+// ── Render financials page ───────────────────────────────────────────────────
+function renderFinancials(data, yearFilter, propFilter, platFilter) {
+  const { byMonth, byProp, byPlatform, byPropMonth, total } = processFinancials(data, yearFilter, propFilter, platFilter);
+
+  const totalRevenue = Object.values(byProp).reduce((s, v) => s + v.revenue, 0);
+  const totalNights  = Object.values(byProp).reduce((s, v) => s + v.nights, 0);
+  const totalProps   = Object.keys(byProp).length;
+  const anr = totalNights > 0 ? totalRevenue / totalNights : 0;
+  const abv = total > 0 ? totalRevenue / total : 0;
+
+  // ── Week-over-week delta ──
+  const todayStr   = new Date().toISOString().slice(0,10);
+  const weekAgoStr = new Date(Date.now() - 7*24*60*60*1000).toISOString().slice(0,10);
+  const prev = processFinancials(data, yearFilter, propFilter, platFilter, weekAgoStr);
+  const prevRev    = Object.values(prev.byProp).reduce((s, v) => s + v.revenue, 0);
+  const prevNights = Object.values(prev.byProp).reduce((s, v) => s + v.nights, 0);
+  const prevProps  = Object.keys(prev.byProp).length;
+  const prevAnr    = prevNights > 0 ? prevRev / prevNights : 0;
+  const prevAbv    = prev.total > 0 ? prevRev / prev.total : 0;
+
+  function delta(curr, old) {
+    if (!old) return '';
+    const pct = (curr - old) / old * 100;
+    const up = pct >= 0;
+    const arrow = up ? '↑' : '↓';
+    const color = up ? '#34d399' : '#f87171';
+    return ` <span style="font-size:0.75rem;font-weight:600;color:${color};white-space:nowrap">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
+  }
+  function deltaAbs(curr, old) {
+    if (old === undefined || old === null) return '';
+    const diff = curr - old;
+    if (diff === 0) return '';
+    const up = diff > 0;
+    const arrow = up ? '↑' : '↓';
+    const color = up ? '#34d399' : '#f87171';
+    return ` <span style="font-size:0.75rem;font-weight:600;color:${color};white-space:nowrap">${arrow} ${Math.abs(diff)}</span>`;
+  }
+
+  document.getElementById('kpi-revenue').innerHTML  = fmtShort(totalRevenue) + delta(totalRevenue, prevRev);
+  document.getElementById('kpi-bookings').innerHTML = total.toLocaleString() + deltaAbs(total, prev.total);
+  document.getElementById('kpi-nights').innerHTML   = totalNights.toLocaleString() + deltaAbs(totalNights, prevNights);
+  document.getElementById('kpi-anr').innerHTML      = (totalNights > 0 ? fmt(anr) : '—') + delta(anr, prevAnr);
+  document.getElementById('kpi-abv').innerHTML      = (total > 0 ? fmt(abv) : '—') + delta(abv, prevAbv);
+  document.getElementById('kpi-props').innerHTML    = totalProps + deltaAbs(totalProps, prevProps);
+
+  const months = Object.keys(byMonth).sort();
+  const monthLabels = months.map(m => { const [y,mo] = m.split('-'); return new Date(y, mo-1).toLocaleString('en', {month:'short', year:'2-digit'}); });
+
+  // Build projected revenue by month (from revenue_targets)
+  const targets = data.revenue_targets || {};
+  const projByMonth = {};
+  if (yearFilter !== 'all') {
+    Object.entries(targets).forEach(([propId, propTgts]) => {
+      if (propFilter !== 'all' && propId !== propFilter) return;
+      Object.entries(propTgts).forEach(([moStr, t]) => {
+        if (!t || t.closed || !t.revenue_target) return;
+        const key = `${yearFilter}-${String(parseInt(moStr)).padStart(2,'0')}`;
+        projByMonth[key] = (projByMonth[key] || 0) + t.revenue_target;
+      });
+    });
+  }
+  const projLine = months.map(m => projByMonth[m] ?? null);
+
+  destroyChart('monthly');
+  charts['monthly'] = new Chart(document.getElementById('monthlyChart'), {
+    type: 'bar',
+    data: { labels: monthLabels, datasets: [
+      { label: 'Actual Revenue', data: months.map(m => byMonth[m].revenue), backgroundColor: '#6366f1cc', borderColor: '#6366f1', borderWidth: 1, borderRadius: 4, order: 2 },
+      ...(projLine.some(v => v != null) ? [{ label: 'Projected', data: projLine, type: 'line', borderColor: '#facc15', backgroundColor: 'transparent', borderWidth: 2, borderDash: [5,4], pointBackgroundColor: '#facc15', pointRadius: 3, tension: 0.3, order: 1 }] : [])
+    ]},
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { display: true, labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 12 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmt(c.raw ?? c.parsed.y)}` } } }, scales: { x: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: '#1e2035' } }, y: { ticks: { color: '#6b7280', font: { size: 10 }, callback: v => fmtShort(v) }, grid: { color: '#1e2035' } } } }
+  });
+
+  const sortedProps = Object.entries(byProp).sort((a,b) => b[1].revenue - a[1].revenue).slice(0, 15);
+  destroyChart('property');
+  charts['property'] = new Chart(document.getElementById('propertyChart'), {
+    type: 'bar',
+    data: { labels: sortedProps.map(([,v]) => v.name.length > 20 ? v.name.slice(0,18)+'…' : v.name), datasets: [{ label: 'Revenue', data: sortedProps.map(([,v]) => v.revenue), backgroundColor: sortedProps.map((_,i) => COLORS[i%COLORS.length]+'cc'), borderColor: sortedProps.map((_,i) => COLORS[i%COLORS.length]), borderWidth: 1, borderRadius: 4 }] },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: true, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmt(c.parsed.x) } } }, scales: { x: { ticks: { color: '#6b7280', font: { size: 10 }, callback: v => fmtShort(v) }, grid: { color: '#1e2035' } }, y: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { display: false } } } }
+  });
+
+  // Actual vs Projected Revenue by Property
+  const propProjected = {};
+  if (yearFilter !== 'all') {
+    Object.entries(targets).forEach(([propId, propTgts]) => {
+      if (propFilter !== 'all' && propId !== propFilter) return;
+      Object.entries(propTgts).forEach(([moStr, t]) => {
+        if (!t || t.closed || !t.revenue_target) return;
+        propProjected[propId] = (propProjected[propId] || 0) + t.revenue_target;
+      });
+    });
+  }
+  const pvIds = [...new Set([...Object.keys(byProp), ...Object.keys(propProjected)])];
+  const pvSorted = pvIds.filter(id => byProp[id] || propProjected[id])
+    .sort((a,b) => ((propProjected[b]||0) + (byProp[b]?.revenue||0)) - ((propProjected[a]||0) + (byProp[a]?.revenue||0)));
+  destroyChart('propVsProjected');
+  charts['propVsProjected'] = new Chart(document.getElementById('propVsProjectedChart'), {
+    type: 'bar',
+    data: {
+      labels: pvSorted.map(id => (byProp[id]?.name || id).slice(0,22)),
+      datasets: [
+        { label: 'Actual Revenue', data: pvSorted.map(id => byProp[id]?.revenue || 0), backgroundColor: '#6366f1cc', borderRadius: 3 },
+        ...(Object.keys(propProjected).length ? [{ label: 'Projected', data: pvSorted.map(id => propProjected[id] || 0), backgroundColor: '#facc1544', borderColor: '#facc15', borderWidth: 1, borderRadius: 3 }] : [])
+      ]
+    },
+    options: { indexAxis: 'y', responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top', labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 12 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmt(c.parsed.x)}` } } }, scales: { x: { ticks: { color: '#6b7280', font: { size: 10 }, callback: v => fmtShort(v) }, grid: { color: '#1e2035' } }, y: { ticks: { color: '#9ca3af', font: { size: 9 } }, grid: { display: false } } } }
+  });
+}
+
+// ── Render occupancy page ────────────────────────────────────────────────────
+function renderOccupancy(data, propFilter) {
+  const pl = data.pricelabs_matched || {};
+  const finByProp = {};
+  data.reservations.filter(r => r.financials?.host?.revenue?.amount != null).forEach(r => {
+    const id = r.properties?.[0]?.id;
+    if (!id) return;
+    if (propFilter !== 'all' && id !== propFilter) return;
+    if (!finByProp[id]) finByProp[id] = { name: getPropertyName(r), revenue: 0, nights: 0 };
+    finByProp[id].revenue += (r.financials.host.revenue.amount || 0) / 100;
+    finByProp[id].nights += r.nights || 0;
+  });
+
+  // Filter pl to selected property
+  const plEntries = Object.entries(pl).filter(([id]) => propFilter === 'all' || id === propFilter);
+
+  // KPIs
+  const occs30 = plEntries.map(([,l]) => pct(l.occupancy_next_30)).filter(v => v !== null);
+  const moccs30 = plEntries.map(([,l]) => pct(l.market_occupancy_next_30)).filter(v => v !== null);
+  const occs60 = plEntries.map(([,l]) => pct(l.occupancy_next_60)).filter(v => v !== null);
+  const moccs60 = plEntries.map(([,l]) => pct(l.market_occupancy_next_60)).filter(v => v !== null);
+  const occs90 = plEntries.map(([,l]) => pct(l.occupancy_next_90)).filter(v => v !== null);
+  const moccs90 = plEntries.map(([,l]) => pct(l.market_occupancy_next_90)).filter(v => v !== null);
+  const bases = plEntries.map(([,l]) => l.base).filter(v => v);
+
+  const avg = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+  const avgOcc30 = avg(occs30), avgMocc30 = avg(moccs30);
+  const avgOcc60 = avg(occs60), avgMocc60 = avg(moccs60);
+  const avgOcc90 = avg(occs90), avgMocc90 = avg(moccs90);
+  const avgBase = avg(bases);
+
+  const vsLabel = (occ, mkt) => occ != null && mkt != null
+    ? (occ >= mkt ? `+${(occ-mkt).toFixed(0)}% vs market` : `${(occ-mkt).toFixed(0)}% vs market`)
+    : 'vs market';
+
+  document.getElementById('kpi-occ30').textContent = avgOcc30 != null ? avgOcc30.toFixed(0)+'%' : '—';
+  document.getElementById('kpi-mocc30').textContent = avgMocc30 != null ? avgMocc30.toFixed(0)+'%' : '—';
+  document.getElementById('kpi-occ30-vs').textContent = vsLabel(avgOcc30, avgMocc30);
+  document.getElementById('kpi-occ60').textContent = avgOcc60 != null ? avgOcc60.toFixed(0)+'%' : '—';
+  document.getElementById('kpi-mocc60').textContent = avgMocc60 != null ? avgMocc60.toFixed(0)+'%' : '—';
+  document.getElementById('kpi-occ60-vs').textContent = vsLabel(avgOcc60, avgMocc60);
+  document.getElementById('kpi-occ90').textContent = avgOcc90 != null ? avgOcc90.toFixed(0)+'%' : '—';
+  document.getElementById('kpi-mocc90').textContent = avgMocc90 != null ? avgMocc90.toFixed(0)+'%' : '—';
+  document.getElementById('kpi-occ90-vs').textContent = vsLabel(avgOcc90, avgMocc90);
+  document.getElementById('kpi-base').textContent = avgBase != null ? fmt(avgBase) : '—';
+  const allNights = Object.values(finByProp).reduce((s,v)=>s+v.nights,0);
+  const allRev = Object.values(finByProp).reduce((s,v)=>s+v.revenue,0);
+  document.getElementById('kpi-actual-anr').textContent = allNights > 0 ? fmt(allRev/allNights) : '—';
+
+  // Listing vs Market occ 30d
+  const props30 = plEntries.filter(([,l]) => l.occupancy_next_30 && l.market_occupancy_next_30)
+    .sort((a,b) => (pct(b[1].occupancy_next_30)||0) - (pct(a[1].occupancy_next_30)||0));
+  const labels30 = props30.map(([id, l]) => (l.name || data.pricelabs_matched?.[id]?.name || id).slice(0,18));
+
+  destroyChart('occChart30');
+  charts['occChart30'] = new Chart(document.getElementById('occChart30'), {
+    type: 'bar',
+    data: {
+      labels: labels30,
+      datasets: [
+        { label: 'Listing Occ %', data: props30.map(([,l]) => pct(l.occupancy_next_30)), backgroundColor: '#6366f1cc', borderRadius: 3 },
+        { label: 'Market Occ %', data: props30.map(([,l]) => pct(l.market_occupancy_next_30)), backgroundColor: '#34d39966', borderRadius: 3 },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top', labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 12 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y?.toFixed(0)}%` } } }, scales: { x: { ticks: { color: '#6b7280', font: { size: 9 } }, grid: { color: '#1e2035' } }, y: { ticks: { color: '#6b7280', font: { size: 10 }, callback: v => v+'%' }, grid: { color: '#1e2035' }, max: 100 } } }
+  });
+
+  // 60 & 90-Day Outlook (combined)
+  const outlookProps = plEntries.filter(([,l]) =>
+    (l.occupancy_next_60 && l.market_occupancy_next_60) ||
+    (l.occupancy_next_90 && l.market_occupancy_next_90)
+  ).sort((a,b) => (pct(b[1].occupancy_next_60)||0) - (pct(a[1].occupancy_next_60)||0));
+  const outlookLabels = outlookProps.map(([id, l]) => (l.name || id).slice(0,18));
+  destroyChart('occOutlookChart');
+  charts['occOutlookChart'] = new Chart(document.getElementById('occOutlookChart'), {
+    type: 'bar',
+    data: {
+      labels: outlookLabels,
+      datasets: [
+        { label: 'Listing 60d', data: outlookProps.map(([,l]) => pct(l.occupancy_next_60)), backgroundColor: '#f59e0bcc', borderRadius: 3 },
+        { label: 'Market 60d', data: outlookProps.map(([,l]) => pct(l.market_occupancy_next_60)), backgroundColor: '#f59e0b33', borderRadius: 3 },
+        { label: 'Listing 90d', data: outlookProps.map(([,l]) => pct(l.occupancy_next_90)), backgroundColor: '#2dd4bfcc', borderRadius: 3 },
+        { label: 'Market 90d', data: outlookProps.map(([,l]) => pct(l.market_occupancy_next_90)), backgroundColor: '#2dd4bf33', borderRadius: 3 },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top', labels: { color: '#9ca3af', font: { size: 10 }, boxWidth: 10 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y?.toFixed(0)}%` } } }, scales: { x: { ticks: { color: '#6b7280', font: { size: 9 } }, grid: { color: '#1e2035' } }, y: { ticks: { color: '#6b7280', font: { size: 10 }, callback: v => v+'%' }, grid: { color: '#1e2035' }, max: 100 } } }
+  });
+
+  // Pricing Overview (min / base / actual ANR / max combined)
+  const priceOvProps = plEntries.filter(([,l]) => l.base)
+    .sort((a,b) => (b[1].base||0) - (a[1].base||0)).slice(0, 20);
+  const priceOvLabels = priceOvProps.map(([id, l]) => (l.name || id).slice(0,18));
+  destroyChart('priceOverviewChart');
+  charts['priceOverviewChart'] = new Chart(document.getElementById('priceOverviewChart'), {
+    type: 'bar',
+    data: {
+      labels: priceOvLabels,
+      datasets: [
+        { label: 'Min Price', data: priceOvProps.map(([,l]) => l.min || null), backgroundColor: '#f8717133', borderRadius: 2 },
+        { label: 'Base Price', data: priceOvProps.map(([,l]) => l.base || null), backgroundColor: '#a78bfacc', borderRadius: 2 },
+        { label: 'Actual ANR', data: priceOvProps.map(([id]) => finByProp[id]?.nights > 0 ? finByProp[id].revenue / finByProp[id].nights : null), backgroundColor: '#34d399cc', borderRadius: 2 },
+        { label: 'Max Price', data: priceOvProps.map(([,l]) => l.max || null), backgroundColor: '#34d39933', borderRadius: 2 },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'top', labels: { color: '#9ca3af', font: { size: 10 }, boxWidth: 10 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y != null ? fmt(c.parsed.y) : '—'}` } } }, scales: { x: { ticks: { color: '#6b7280', font: { size: 9 } }, grid: { color: '#1e2035' } }, y: { ticks: { color: '#6b7280', font: { size: 10 }, callback: v => fmtShort(v) }, grid: { color: '#1e2035' } } } }
+  });
+
+  // MPI bar
+  const mpiProps = plEntries.filter(([,l]) => l.mpi_next_30 != null).sort((a,b) => (b[1].mpi_next_30||0)-(a[1].mpi_next_30||0));
+  const mpiLabels = mpiProps.map(([id, l]) => (l.name || id).slice(0,18));
+  const mpiColors = mpiProps.map(([,l]) => l.mpi_next_30 >= 1 ? '#34d399cc' : l.mpi_next_30 >= 0.6 ? '#facc15cc' : '#f87171cc');
+
+  destroyChart('mpiChart');
+  charts['mpiChart'] = new Chart(document.getElementById('mpiChart'), {
+    type: 'bar',
+    data: {
+      labels: mpiLabels,
+      datasets: [{
+        label: 'MPI (Next 30d)',
+        data: mpiProps.map(([,l]) => l.mpi_next_30),
+        backgroundColor: mpiColors,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `MPI: ${c.parsed.y?.toFixed(2)}` } } },
+      scales: {
+        x: { ticks: { color: '#6b7280', font: { size: 9 } }, grid: { color: '#1e2035' } },
+        y: { ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: '#1e2035' },
+          afterDataLimits(scale) { scale.max = Math.max(scale.max, 1.5); } }
+      },
+      plugins: {
+        annotation: {}
+      }
+    }
+  });
+}
+
+// ── Render properties table ──────────────────────────────────────────────────
+function renderPropertiesTable(data, yearFilter, propFilter, platFilter) {
+  const { byProp, byPropMonth, total } = processFinancials(data, yearFilter, propFilter, platFilter);
+  const fees = data.management_fees || {};
+  applyMgmtFees(byProp, byPropMonth, fees);
+  const pl = data.pricelabs_matched || {};
+  const totalRev = Object.values(byProp).reduce((s,v)=>s+v.revenue,0);
+
+  const sorted = Object.entries(byProp).sort((a,b) => b[1].revenue - a[1].revenue);
+  const tbody = document.getElementById('propTable');
+  tbody.innerHTML = '';
+  sorted.forEach(([id, v], i) => {
+    const plData = pl[id];
+    const anr = v.nights > 0 ? fmt(v.revenue/v.nights) : '—';
+    const abv = v.bookings > 0 ? fmt(v.revenue/v.bookings) : '—';
+    const share = totalRev > 0 ? (v.revenue/totalRev*100).toFixed(1) : '0.0';
+    const occ30 = plData ? pct(plData.occupancy_next_30) : null;
+    const mocc30 = plData ? pct(plData.market_occupancy_next_30) : null;
+    const occ60 = plData ? pct(plData.occupancy_next_60) : null;
+    const mocc60 = plData ? pct(plData.market_occupancy_next_60) : null;
+    const occ90 = plData ? pct(plData.occupancy_next_90) : null;
+    const mocc90 = plData ? pct(plData.market_occupancy_next_90) : null;
+    const mpi = plData?.mpi_next_30;
+    const mpiClass = mpi == null ? '' : mpi >= 1 ? 'high' : mpi >= 0.6 ? 'mid' : 'low';
+    const occCell = v => v != null ? v.toFixed(0)+'%' : '<span class="muted">—</span>';
+
+    tbody.innerHTML += `<tr>
+      <td class="muted">${i<3?`<span class="pill top">#${i+1}</span>`:i+1}</td>
+      <td>${v.name}</td>
+      <td class="num">${v.bookings}</td>
+      <td class="num">${v.nights}</td>
+      <td class="num">${anr}</td>
+      <td class="num">${abv}</td>
+      <td class="num positive">${fmt(v.revenue)}</td>
+      <td class="num">${share}%</td>
+      <td class="num">${plData?.base ? fmt(plData.base) : '<span class="muted">—</span>'}</td>
+      <td class="num">${plData?.min ? fmt(plData.min) : '<span class="muted">—</span>'}</td>
+      <td class="num">${plData?.max ? fmt(plData.max) : '<span class="muted">—</span>'}</td>
+      <td class="num">${occCell(occ30)}</td>
+      <td class="num">${occCell(mocc30)}</td>
+      <td class="num">${occCell(occ60)}</td>
+      <td class="num">${occCell(mocc60)}</td>
+      <td class="num">${occCell(occ90)}</td>
+      <td class="num">${occCell(mocc90)}</td>
+      <td class="num">${mpi != null ? `<span class="mpi ${mpiClass}">${mpi.toFixed(2)}</span>` : '<span class="muted">—</span>'}</td>
+      <td class="num">${v.mgmtFeePct ? v.mgmtFeePct+'%' : '<span class="muted">—</span>'}</td>
+      <td class="num positive">${v.mgmtFeeEarned > 0 ? fmt(v.mgmtFeeEarned) : '<span class="muted">—</span>'}</td>
+      <td class="num">${v.ownerPayout > 0 ? fmt(v.ownerPayout) : '<span class="muted">—</span>'}</td>
+    </tr>`;
+  });
+
+}
+
+// ── Mgmt fee helpers ─────────────────────────────────────────────────────────
+const MGMT_FEE_HST = 0.13; // 13% HST on management fee
+
+function applyMgmtFees(byProp, byPropMonth, fees) {
+  Object.entries(byProp).forEach(([id, v]) => {
+    const fee = fees[id];
+    const pct = fee ? fee.value : 0;
+    v.mgmtFeePct = pct;
+    v.mgmtFeeEarned = v.revenue * (pct / 100);
+    v.mgmtFeeHst = v.mgmtFeeEarned * MGMT_FEE_HST;
+    v.ownerPayout = v.revenue - v.cleaningFee - v.mgmtFeeEarned - v.mgmtFeeHst;
+  });
+  Object.entries(byPropMonth).forEach(([id, mData]) => {
+    const fee = fees[id];
+    const pct = fee ? fee.value : 0;
+    Object.entries(mData).forEach(([month, v]) => {
+      if (month === 'name') return;
+      v.mgmtFeePct = pct;
+      v.mgmtFeeEarned = v.revenue * (pct / 100);
+      v.mgmtFeeHst = v.mgmtFeeEarned * MGMT_FEE_HST;
+      v.ownerPayout = v.revenue - v.cleaningFee - v.mgmtFeeEarned - v.mgmtFeeHst;
+    });
+  });
+}
+
+// ── Render gross profit page ──────────────────────────────────────────────────
+function renderGrossProfit(data, yearFilter, propFilter, platFilter) {
+  const fees = data.management_fees || {};
+  const { byProp, byPropMonth, total } = processFinancials(data, yearFilter, propFilter, platFilter);
+  applyMgmtFees(byProp, byPropMonth, fees);
+
+  const totalMgmt = Object.values(byProp).reduce((s, v) => s + v.mgmtFeeEarned, 0);
+  const totalOwner = Object.values(byProp).reduce((s, v) => s + v.ownerPayout, 0);
+  const totalRev = Object.values(byProp).reduce((s, v) => s + v.revenue, 0);
+  const weightedMargin = totalRev > 0 ? (totalMgmt / totalRev * 100) : 0;
+  const totalHst = Object.values(byProp).reduce((s, v) => s + v.mgmtFeeHst, 0);
+  const totalCleaning = Object.values(byProp).reduce((s, v) => s + v.cleaningFee, 0);
+
+  document.getElementById('kpi-gp-mgmt').textContent = fmtShort(totalMgmt);
+  document.getElementById('kpi-gp-owner').textContent = fmtShort(totalOwner);
+  document.getElementById('kpi-gp-margin').textContent = weightedMargin.toFixed(1) + '%';
+  document.getElementById('kpi-gp-per-booking').textContent = total > 0 ? fmt(totalMgmt / total) : '—';
+  document.getElementById('kpi-gp-hst').textContent = fmtShort(totalHst);
+  document.getElementById('kpi-gp-cleaning').textContent = fmtShort(totalCleaning);
+
+  // Collect all months
+  const monthSet = new Set();
+  Object.values(byPropMonth).forEach(mData => Object.keys(mData).forEach(k => { if (k !== 'name') monthSet.add(k); }));
+  const months = [...monthSet].sort();
+  const monthLabels = months.map(m => { const [y, mo] = m.split('-'); return new Date(y, mo-1).toLocaleString('en', {month:'short', year:'2-digit'}); });
+
+  const mgmtByMonth = months.map(m => Object.values(byPropMonth).reduce((s, mData) => s + (mData[m]?.mgmtFeeEarned || 0), 0));
+  const ownerByMonth = months.map(m => Object.values(byPropMonth).reduce((s, mData) => s + (mData[m]?.ownerPayout || 0), 0));
+
+  destroyChart('gpMonthly');
+  charts['gpMonthly'] = new Chart(document.getElementById('gpMonthlyChart'), {
+    type: 'bar',
+    data: {
+      labels: monthLabels,
+      datasets: [
+        { label: 'Mgmt Fee Earned', data: mgmtByMonth, backgroundColor: '#a78bfacc', borderColor: '#a78bfa', borderWidth: 1, borderRadius: 3 },
+        { label: 'Owner Payout', data: ownerByMonth, backgroundColor: '#60a5facc', borderColor: '#60a5fa', borderWidth: 1, borderRadius: 3 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { position: 'top', labels: { color: '#9ca3af', font: { size: 11 }, boxWidth: 12 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmt(c.parsed.y)}` } } },
+      scales: {
+        x: { stacked: true, ticks: { color: '#6b7280', font: { size: 10 } }, grid: { color: '#1e2035' } },
+        y: { stacked: true, ticks: { color: '#6b7280', font: { size: 10 }, callback: v => fmtShort(v) }, grid: { color: '#1e2035' } }
+      }
+    }
+  });
+
+  // Mgmt fee by property (horizontal bar)
+  const sortedByMgmt = Object.entries(byProp).sort((a, b) => b[1].mgmtFeeEarned - a[1].mgmtFeeEarned);
+  destroyChart('gpProperty');
+  charts['gpProperty'] = new Chart(document.getElementById('gpPropertyChart'), {
+    type: 'bar',
+    data: {
+      labels: sortedByMgmt.map(([, v]) => v.name.length > 20 ? v.name.slice(0,18)+'…' : v.name),
+      datasets: [{ label: 'Mgmt Fee Earned', data: sortedByMgmt.map(([, v]) => v.mgmtFeeEarned), backgroundColor: sortedByMgmt.map((_, i) => COLORS[i % COLORS.length] + 'cc'), borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => fmt(c.parsed.x) } } },
+      scales: {
+        x: { ticks: { color: '#6b7280', font: { size: 10 }, callback: v => fmtShort(v) }, grid: { color: '#1e2035' } },
+        y: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+
+  // Margin % by property
+  const sortedByMargin = Object.entries(byProp).filter(([,v]) => v.mgmtFeePct > 0).sort((a, b) => b[1].mgmtFeePct - a[1].mgmtFeePct);
+  const marginColors = sortedByMargin.map(([, v]) => v.mgmtFeePct >= 20 ? '#34d399cc' : v.mgmtFeePct >= 15 ? '#facc15cc' : '#fb923ccc');
+  destroyChart('gpMargin');
+  charts['gpMargin'] = new Chart(document.getElementById('gpMarginChart'), {
+    type: 'bar',
+    data: {
+      labels: sortedByMargin.map(([, v]) => v.name.length > 20 ? v.name.slice(0,18)+'…' : v.name),
+      datasets: [{ label: 'Gross Margin %', data: sortedByMargin.map(([, v]) => v.mgmtFeePct), backgroundColor: marginColors, borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.x + '%' } } },
+      scales: {
+        x: { ticks: { color: '#6b7280', font: { size: 10 }, callback: v => v+'%' }, grid: { color: '#1e2035' }, max: 30 },
+        y: { ticks: { color: '#9ca3af', font: { size: 10 } }, grid: { display: false } }
+      }
+    }
+  });
+
+  // ── Monthly Gross Profit Table ──
+  const gpByMonth = {};
+  Object.entries(byPropMonth).forEach(([propId, propMonths]) => {
+    const feePct = fees[propId]?.value;
+    Object.entries(propMonths).forEach(([month, vals]) => {
+      if (month === 'name') return;
+      if (!gpByMonth[month]) gpByMonth[month] = { revenue: 0, mgmtFee: 0, mgmtFeeHst: 0, cleaningFee: 0, bookings: 0, nights: 0, hasFee: false };
+      gpByMonth[month].revenue += vals.revenue;
+      gpByMonth[month].cleaningFee += vals.cleaningFee || 0;
+      gpByMonth[month].bookings += vals.bookings;
+      gpByMonth[month].nights += vals.nights || 0;
+      if (feePct != null) {
+        const fee = vals.revenue * feePct / 100;
+        gpByMonth[month].mgmtFee += fee;
+        gpByMonth[month].mgmtFeeHst += fee * MGMT_FEE_HST;
+        gpByMonth[month].hasFee = true;
+      }
+    });
+  });
+
+  const gpMonths = Object.keys(gpByMonth).sort();
+  const gpTbody = document.getElementById('gpMonthlyTableBody');
+  const gpTfoot = document.getElementById('gpMonthlyTableFoot');
+  if (!gpTbody) return;
+  gpTbody.innerHTML = '';
+  let totRev = 0, totFee = 0, totBook = 0, totNights = 0, anyFee = false;
+  gpMonths.forEach(m => {
+    const g = gpByMonth[m];
+    const ownerPayout = g.hasFee ? g.revenue - g.cleaningFee - g.mgmtFee - g.mgmtFeeHst : null;
+    const margin = g.hasFee && g.revenue > 0 ? (g.mgmtFee / g.revenue * 100) : null;
+    const anrVal = g.nights > 0 ? g.revenue / g.nights : null;
+    const [_y, _mo] = m.split('-');
+    const label = new Date(+_y, +_mo-1).toLocaleString('en', { month: 'short', year: 'numeric' });
+    totRev += g.revenue; totFee += g.mgmtFee; totBook += g.bookings; totNights += g.nights;
+    if (g.hasFee) anyFee = true;
+    gpTbody.innerHTML += `<tr>
+      <td>${label}</td>
+      <td class="num">${fmt(g.revenue)}</td>
+      <td class="num muted">${g.cleaningFee > 0 ? fmt(g.cleaningFee) : '—'}</td>
+      <td class="num positive">${g.hasFee ? fmt(g.mgmtFee) : '<span class="muted">—</span>'}</td>
+      <td class="num muted">${g.hasFee ? fmt(g.mgmtFeeHst) : '<span class="muted">—</span>'}</td>
+      <td class="num">${ownerPayout != null ? fmt(ownerPayout) : '<span class="muted">—</span>'}</td>
+      <td class="num">${margin != null ? margin.toFixed(1) + '%' : '<span class="muted">—</span>'}</td>
+      <td class="num">${g.bookings}</td>
+      <td class="num">${g.nights}</td>
+      <td class="num">${anrVal != null ? fmt(anrVal) : '—'}</td>
+    </tr>`;
+  });
+  const totCleaning2 = Object.values(gpByMonth).reduce((s, g) => s + (g.cleaningFee || 0), 0);
+  const totHst2 = anyFee ? totFee * MGMT_FEE_HST : 0;
+  const totOwner2 = anyFee ? totRev - totCleaning2 - totFee - totHst2 : null;
+  const totMargin2 = anyFee && totRev > 0 ? (totFee / totRev * 100) : null;
+  const totAnr2 = totNights > 0 ? totRev / totNights : null;
+  gpTfoot.innerHTML = `<tr style="border-top:2px solid #3d4168;font-weight:700;color:#e2e8f0">
+    <td>Total</td>
+    <td class="num">${fmt(totRev)}</td>
+    <td class="num muted">${totCleaning2 > 0 ? fmt(totCleaning2) : '—'}</td>
+    <td class="num positive">${anyFee ? fmt(totFee) : '—'}</td>
+    <td class="num muted">${anyFee ? fmt(totHst2) : '—'}</td>
+    <td class="num">${totOwner2 != null ? fmt(totOwner2) : '—'}</td>
+    <td class="num">${totMargin2 != null ? totMargin2.toFixed(1) + '%' : '—'}</td>
+    <td class="num">${totBook}</td>
+    <td class="num">${totNights}</td>
+    <td class="num">${totAnr2 != null ? fmt(totAnr2) : '—'}</td>
+  </tr>`;
+}
+
+// ── Insights engine ──────────────────────────────────────────────────────────
+
+function generateInsights(propId, propName, plData, finAllYears, fin2024, fin2025, feeData) {
+  const recs = [];   // { text, type: 'positive'|'warning'|'urgent'|'' }
+  let statusScore = 0; // higher = healthier
+
+  const occ30  = pct(plData?.occupancy_next_30);
+  const mocc30 = pct(plData?.market_occupancy_next_30);
+  const occ60  = pct(plData?.occupancy_next_60);
+  const mocc60 = pct(plData?.market_occupancy_next_60);
+  const occ90  = pct(plData?.occupancy_next_90);
+  const mocc90 = pct(plData?.market_occupancy_next_90);
+  const mpi30  = plData?.mpi_next_30;
+  const mpi60  = plData?.mpi_next_60;
+  const basePrice = plData?.base;
+  const recBase   = plData?.recommended_base_price;
+  const pickup    = plData?.booking_pickup_unique_past_30 ?? null;
+  const revNext30     = plData?.revenue_next_30;
+  const stlyNext30    = plData?.stly_revenue_next_30;
+  const revYTD        = plData?.revenue_ytd;
+  const stlyYTD       = plData?.stly_revenue_ytd;
+
+  // Computed from Hospitable
+  const anr2025 = fin2025?.nights > 0 ? fin2025.revenue / fin2025.nights : null;
+  const anr2024 = fin2024?.nights > 0 ? fin2024.revenue / fin2024.nights : null;
+  const yoyRev  = fin2024?.revenue > 0 && fin2025?.revenue > 0
+    ? ((fin2025.revenue - fin2024.revenue) / fin2024.revenue * 100) : null;
+
+  // ── Occupancy vs market ────────────────────────────────────────────────
+  if (occ30 != null && mocc30 != null) {
+    const delta = occ30 - mocc30;
+    if (delta >= 15) {
+      recs.push({ text: `Strong near-term demand: ${occ30}% booked vs ${mocc30}% market — opportunity to raise rates.`, type: 'positive' });
+      statusScore += 2;
+    } else if (delta <= -15) {
+      recs.push({ text: `Low 30-day bookings: ${occ30}% vs ${mocc30}% market (${Math.abs(delta)}% gap) — consider short-stay promotions or price drop.`, type: 'urgent' });
+      statusScore -= 2;
+    } else if (delta <= -8) {
+      recs.push({ text: `Slightly below market occupancy (${occ30}% vs ${mocc30}%) — monitor closely over next 2 weeks.`, type: 'warning' });
+      statusScore -= 1;
+    } else {
+      statusScore += 1;
+    }
+  }
+
+  if (occ60 != null && mocc60 != null) {
+    const delta60 = occ60 - mocc60;
+    if (delta60 <= -15) {
+      recs.push({ text: `60-day outlook weak: ${occ60}% vs ${mocc60}% market — open minimum stay restrictions or run limited discounts.`, type: 'urgent' });
+      statusScore -= 1;
+    } else if (delta60 >= 10) {
+      recs.push({ text: `60-day pipeline strong (${occ60}% vs ${mocc60}% market) — lock in higher weekend rates now.`, type: 'positive' });
+      statusScore += 1;
+    }
+  }
+
+  if (occ90 != null && mocc90 != null) {
+    const delta90 = occ90 - mocc90;
+    if (delta90 <= -20) {
+      recs.push({ text: `90-day bookings far below market (${occ90}% vs ${mocc90}%) — review seasonal pricing strategy.`, type: 'warning' });
+      statusScore -= 1;
+    }
+  }
+
+  // ── MPI ────────────────────────────────────────────────────────────────
+  if (mpi30 != null) {
+    if (mpi30 >= 1.2) {
+      recs.push({ text: `Excellent MPI of ${mpi30.toFixed(2)} — outperforming the market. Maintain current strategy.`, type: 'positive' });
+      statusScore += 2;
+    } else if (mpi30 >= 1.0) {
+      statusScore += 1;
+    } else if (mpi30 < 0.5) {
+      recs.push({ text: `Critical MPI of ${mpi30.toFixed(2)} — significantly underperforming market. Refresh photos, title, and pricing.`, type: 'urgent' });
+      statusScore -= 2;
+    } else if (mpi30 < 0.7) {
+      recs.push({ text: `Below-average MPI of ${mpi30.toFixed(2)} — listing may need a refresh or pricing adjustment.`, type: 'warning' });
+      statusScore -= 1;
+    }
+  }
+
+  // MPI trend 30d vs 60d
+  if (mpi30 != null && mpi60 != null && Math.abs(mpi30 - mpi60) >= 0.2) {
+    if (mpi30 > mpi60) {
+      recs.push({ text: `Improving MPI trend: 30d ${mpi30.toFixed(2)} vs 60d ${mpi60.toFixed(2)} — momentum building.`, type: 'positive' });
+    } else {
+      recs.push({ text: `Declining MPI trend: 30d ${mpi30.toFixed(2)} vs 60d ${mpi60.toFixed(2)} — demand softening ahead.`, type: 'warning' });
+      statusScore -= 1;
+    }
+  }
+
+  // ── Pricing ────────────────────────────────────────────────────────────
+  if (recBase && recBase !== 'Unavailable' && basePrice) {
+    const recNum = parseFloat(recBase);
+    if (!isNaN(recNum)) {
+      const diff = ((recNum - basePrice) / basePrice * 100);
+      if (diff >= 10) {
+        recs.push({ text: `PriceLabs recommends raising base from ${fmt(basePrice)} → ${fmt(recNum)} (+${diff.toFixed(0)}%).`, type: 'positive' });
+      } else if (diff <= -10) {
+        recs.push({ text: `PriceLabs recommends lowering base from ${fmt(basePrice)} → ${fmt(recNum)} (${diff.toFixed(0)}%).`, type: 'warning' });
+      }
+    }
+  }
+
+  if (anr2025 != null && basePrice) {
+    const anrVsBase = ((anr2025 - basePrice) / basePrice * 100);
+    if (anrVsBase >= 20) {
+      recs.push({ text: `Actual nightly rate ${fmt(anr2025)} is ${anrVsBase.toFixed(0)}% above base — consider raising your PriceLabs base price.`, type: 'positive' });
+    } else if (anrVsBase <= -25) {
+      recs.push({ text: `Actual nightly rate ${fmt(anr2025)} is ${Math.abs(anrVsBase).toFixed(0)}% below base — check listing competitiveness and reviews.`, type: 'warning' });
+    }
+  }
+
+  if (plData && !plData.max) {
+    recs.push({ text: 'No maximum price set — missing peak demand revenue. Add a max price in PriceLabs.', type: 'warning' });
+    statusScore -= 1;
+  }
+
+  // ── Revenue pacing (PriceLabs YTD/next 30d) ───────────────────────────
+  if (revNext30 != null && stlyNext30 != null && stlyNext30 > 0) {
+    const pace = ((revNext30 - stlyNext30) / stlyNext30 * 100);
+    if (pace >= 15) {
+      recs.push({ text: `Pacing ${pace.toFixed(0)}% ahead of same period last year for next 30 days (${fmt(revNext30)} vs ${fmt(stlyNext30)}).`, type: 'positive' });
+      statusScore += 1;
+    } else if (pace <= -15) {
+      recs.push({ text: `Pacing ${Math.abs(pace).toFixed(0)}% behind last year for next 30 days (${fmt(revNext30)} vs ${fmt(stlyNext30)}).`, type: 'urgent' });
+      statusScore -= 1;
+    }
+  }
+
+  if (revYTD != null && stlyYTD != null && stlyYTD > 0) {
+    const ytdPace = ((revYTD - stlyYTD) / stlyYTD * 100);
+    if (ytdPace >= 20) {
+      recs.push({ text: `YTD revenue up ${ytdPace.toFixed(0)}% vs same period last year (${fmt(revYTD)} vs ${fmt(stlyYTD)}).`, type: 'positive' });
+    } else if (ytdPace <= -20) {
+      recs.push({ text: `YTD revenue down ${Math.abs(ytdPace).toFixed(0)}% vs same period last year — review strategy urgently.`, type: 'urgent' });
+    }
+  }
+
+  // ── Hospitable YoY (2024 vs 2025 full year) ───────────────────────────
+  if (yoyRev != null) {
+    if (yoyRev >= 25) {
+      recs.push({ text: `Strong full-year growth: 2025 revenue up ${yoyRev.toFixed(0)}% vs 2024 (${fmt(fin2025.revenue)} vs ${fmt(fin2024.revenue)}).`, type: 'positive' });
+      statusScore += 1;
+    } else if (yoyRev <= -15) {
+      recs.push({ text: `Full-year revenue down ${Math.abs(yoyRev).toFixed(0)}% vs 2024 (${fmt(fin2025.revenue)} vs ${fmt(fin2024.revenue)}) — needs strategic review.`, type: 'urgent' });
+      statusScore -= 1;
+    }
+  }
+
+  // ── Booking pickup ─────────────────────────────────────────────────────
+  if (pickup === 0) {
+    recs.push({ text: 'Zero new bookings in past 30 days — urgent: check calendar availability, pricing, and listing visibility.', type: 'urgent' });
+    statusScore -= 2;
+  } else if (pickup != null && pickup >= 6) {
+    recs.push({ text: `High booking momentum: ${pickup} new bookings in the past 30 days.`, type: 'positive' });
+    statusScore += 1;
+  }
+
+  if (recs.length === 0) {
+    recs.push({ text: 'Performance looks stable. Continue monitoring occupancy and pricing weekly.', type: '' });
+  }
+
+  const status = statusScore >= 2 ? 'healthy' : statusScore <= -2 ? 'action' : 'monitor';
+  return { status, recs, occ30, mocc30, mpi30, anr: anr2025, yoyRev, pickup };
+}
+
+function renderInsights(data) {
+  // Build per-year revenue by property from Hospitable
+  const byPropYear = {};
+  data.reservations.forEach(r => {
+    const fin = r.financials;
+    if (!fin?.host?.revenue?.amount) return;
+    const id = r.properties?.[0]?.id;
+    if (!id) return;
+    const year = (r.arrival_date || r.check_in || '').substring(0, 4);
+    if (!byPropYear[id]) byPropYear[id] = {};
+    if (!byPropYear[id][year]) byPropYear[id][year] = { revenue: 0, nights: 0, bookings: 0 };
+    byPropYear[id][year].revenue += (fin.host.revenue.amount || 0) / 100;
+    byPropYear[id][year].nights  += r.nights || 0;
+    byPropYear[id][year].bookings++;
+  });
+
+  const pl   = data.pricelabs_matched || {};
+  const fees = data.management_fees || {};
+  const props = data.properties;
+
+  // Build insight for each property
+  const cards = props.map(p => {
+    const plData  = pl[p.id];
+    const finAll  = byPropYear[p.id] || {};
+    const fin2024 = finAll['2024'];
+    const fin2025 = finAll['2025'];
+    const insight = generateInsights(p.id, p.name, plData, finAll, fin2024, fin2025, fees[p.id]);
+    return { id: p.id, name: p.name, plData, insight };
+  });
+
+  // Sort: action first, then monitor, then healthy
+  const order = { action: 0, monitor: 1, healthy: 2 };
+  cards.sort((a, b) => order[a.insight.status] - order[b.insight.status]);
+
+  // Store for filter buttons
+  window._insightCards = cards;
+  renderInsightCards(cards, 'all');
+
+  // Filter buttons
+  document.querySelectorAll('.insights-filter button').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.insights-filter button').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      renderInsightCards(window._insightCards, btn.dataset.status);
+    };
+  });
+}
+
+function renderInsightCards(cards, statusFilter) {
+  const grid = document.getElementById('insightsGrid');
+  const filtered = statusFilter === 'all' ? cards : cards.filter(c => c.insight.status === statusFilter);
+  grid.innerHTML = '';
+
+  filtered.forEach(({ name, plData, insight }) => {
+    const { status, recs, occ30, mocc30, mpi30, anr, yoyRev, pickup } = insight;
+
+    const occDelta = (occ30 != null && mocc30 != null) ? (occ30 - mocc30) : null;
+    const occClass = occDelta == null ? '' : occDelta >= 8 ? 'up' : occDelta <= -8 ? 'down' : '';
+    const mpiClass2 = mpi30 == null ? '' : mpi30 >= 1 ? 'up' : mpi30 < 0.7 ? 'down' : 'warn';
+    const yoyClass  = yoyRev == null ? '' : yoyRev >= 10 ? 'up' : yoyRev <= -10 ? 'down' : '';
+    const pickupClass = pickup === 0 ? 'down' : pickup >= 5 ? 'up' : '';
+
+    const metricHtml = [
+      occ30 != null ? `<div class="ic-metric"><div class="m-val ${occClass}">${occ30}%</div><div class="m-lbl">Occ 30d</div></div>` : '',
+      mocc30 != null ? `<div class="ic-metric"><div class="m-val muted">${mocc30}%</div><div class="m-lbl">Mkt 30d</div></div>` : '',
+      mpi30 != null ? `<div class="ic-metric"><div class="m-val ${mpiClass2}">${mpi30.toFixed(2)}</div><div class="m-lbl">MPI 30d</div></div>` : '',
+      anr != null ? `<div class="ic-metric"><div class="m-val">${fmt(anr)}</div><div class="m-lbl">Actual ANR</div></div>` : '',
+      plData?.base ? `<div class="ic-metric"><div class="m-val muted">${fmt(plData.base)}</div><div class="m-lbl">PL Base</div></div>` : '',
+      yoyRev != null ? `<div class="ic-metric"><div class="m-val ${yoyClass}">${yoyRev >= 0 ? '+' : ''}${yoyRev.toFixed(0)}%</div><div class="m-lbl">YoY Rev</div></div>` : '',
+      pickup != null ? `<div class="ic-metric"><div class="m-val ${pickupClass}">${pickup}</div><div class="m-lbl">Pickup 30d</div></div>` : '',
+    ].filter(Boolean).join('');
+
+    const recsHtml = recs.map(r => `<li class="${r.type}">${r.text}</li>`).join('');
+    const statusLabel = status === 'healthy' ? 'Healthy' : status === 'monitor' ? 'Monitor' : 'Action Required';
+
+    grid.innerHTML += `
+      <div class="insight-card ${status}">
+        <div class="ic-header">
+          <div class="ic-name">${name}</div>
+          <span class="badge ${status}">${statusLabel}</span>
+        </div>
+        <div class="ic-metrics">${metricHtml}</div>
+        <hr class="ic-divider">
+        <ul class="ic-recs">${recsHtml}</ul>
+      </div>`;
+  });
+
+  if (filtered.length === 0) {
+    grid.innerHTML = '<p style="color:#6b7280;font-size:0.85rem;">No properties match this filter.</p>';
+  }
+}
+
+// ── Property View ─────────────────────────────────────────────────────────────
+
+let _pvCharts = {};
+
+function destroyPvCharts() {
+  Object.keys(_pvCharts).forEach(id => { if (_pvCharts[id]) { _pvCharts[id].destroy(); } });
+  _pvCharts = {};
+}
+
+function showPvList() {
+  destroyPvCharts();
+  document.getElementById('pv-list').style.display = '';
+  document.getElementById('pv-detail').style.display = 'none';
+}
+
+function renderPropertyList(data, yearFilter) {
+  yearFilter = yearFilter || 'all';
+  // Build per-property stats (all years for YoY context, plus filtered year)
+  const byPropYear = {};
+  data.reservations.forEach(r => {
+    const fin = r.financials;
+    if (!fin?.host?.revenue?.amount) return;
+    const id = r.properties?.[0]?.id;
+    if (!id) return;
+    const yr = (r.departure_date || r.check_out || '').substring(0, 4);  // group by checkout year
+    const rev = fin.host.revenue.amount / 100;
+    if (!byPropYear[id]) byPropYear[id] = {};
+    if (!byPropYear[id][yr]) byPropYear[id][yr] = { revenue: 0, nights: 0, bookings: 0 };
+    byPropYear[id][yr].revenue += rev;
+    byPropYear[id][yr].nights += r.nights || 0;
+    byPropYear[id][yr].bookings++;
+  });
+
+  const pl = data.pricelabs_matched || {};
+  const fees = data.management_fees || {};
+
+  // Sort: by selected-year revenue desc (fall back to all-time)
+  const props = [...data.properties].sort((a, b) => {
+    const revA = yearFilter !== 'all' ? (byPropYear[a.id]?.[yearFilter]?.revenue || 0) : Object.values(byPropYear[a.id] || {}).reduce((s, v) => s + v.revenue, 0);
+    const revB = yearFilter !== 'all' ? (byPropYear[b.id]?.[yearFilter]?.revenue || 0) : Object.values(byPropYear[b.id] || {}).reduce((s, v) => s + v.revenue, 0);
+    return revB - revA;
+  });
+
+  const grid = document.getElementById('pvGrid');
+
+  function renderCards(q) {
+    grid.innerHTML = '';
+    props.forEach(p => {
+      if (q && !p.name.toLowerCase().includes(q)) return;
+      const finAll = byPropYear[p.id] || {};
+      const plData = pl[p.id];
+      const feeData = fees[p.id];
+      const insight = generateInsights(p.id, p.name, plData, finAll, finAll['2024'], finAll['2025'], feeData);
+      const occ30 = pct(plData?.occupancy_next_30);
+      const mpi30 = plData?.mpi_next_30;
+      const feePct = feeData?.value;
+
+      // Revenue for selected year (or total if 'all')
+      const yearStats = yearFilter !== 'all' ? (finAll[yearFilter] || { revenue: 0, bookings: 0 }) : Object.values(finAll).reduce((acc, v) => ({ revenue: acc.revenue + v.revenue, bookings: acc.bookings + v.bookings }), { revenue: 0, bookings: 0 });
+      const displayRev = yearStats.revenue;
+      const revLabel = yearFilter !== 'all' ? `${yearFilter} Rev` : 'Total Rev';
+      const bookingsLabel = yearFilter !== 'all' ? `${yearFilter} Bookings` : 'Bookings';
+
+      // YoY (always 2024→2025 for context)
+      const rev2024 = finAll['2024']?.revenue || 0;
+      const rev2025 = finAll['2025']?.revenue || 0;
+      let yoyHtml = '';
+      if (rev2024 > 0 && rev2025 > 0) {
+        const yoy = (rev2025 - rev2024) / rev2024 * 100;
+        yoyHtml = `<div class="pv-stat"><div class="sv ${yoy >= 0 ? 'positive' : 'negative'}">${yoy >= 0 ? '+' : ''}${yoy.toFixed(0)}%</div><div class="sl">YoY 24→25</div></div>`;
+      } else {
+        yoyHtml = `<div class="pv-stat"><div class="sv muted">${rev2024 ? fmtShort(rev2024) : '—'}</div><div class="sl">2024 Rev</div></div>`;
+      }
+      const statusLabel = insight.status === 'healthy' ? 'Healthy' : insight.status === 'monitor' ? 'Monitor' : 'Action';
+      const card = document.createElement('div');
+      card.className = `pv-card ${insight.status}`;
+      card.dataset.propid = p.id;
+      card.innerHTML = `
+        <div class="pv-card-header">
+          <div class="pv-card-name">${p.name}</div>
+          <span class="badge ${insight.status}">${statusLabel}</span>
+        </div>
+        <div class="pv-card-stats">
+          <div class="pv-stat"><div class="sv">${fmtShort(displayRev)}</div><div class="sl">${revLabel}</div></div>
+          <div class="pv-stat"><div class="sv">${occ30 != null ? occ30 + '%' : '—'}</div><div class="sl">Occ 30d</div></div>
+          <div class="pv-stat"><div class="sv ${mpi30 != null ? (mpi30 >= 1 ? 'positive' : 'negative') : ''}">${mpi30 != null ? mpi30.toFixed(2) : '—'}</div><div class="sl">MPI 30d</div></div>
+          <div class="pv-stat"><div class="sv">${yearStats.bookings}</div><div class="sl">${bookingsLabel}</div></div>
+          <div class="pv-stat"><div class="sv">${feePct != null ? feePct + '%' : '—'}</div><div class="sl">Mgmt %</div></div>
+          ${yoyHtml}
+        </div>`;
+      card.onclick = () => renderPropertyDetail(data, p.id, yearFilter);
+      grid.appendChild(card);
+    });
+    if (!grid.children.length) grid.innerHTML = '<p style="color:#6b7280;font-size:0.85rem;">No properties found.</p>';
+  }
+
+  renderCards('');
+  const searchEl = document.getElementById('pvSearch');
+  searchEl.oninput = () => renderCards(searchEl.value.toLowerCase());
+  document.getElementById('pvBack').onclick = showPvList;
+}
+
+function renderPropertyDetail(data, propId, yearFilter) {
+  yearFilter = yearFilter || 'all';
+  destroyPvCharts();
+  document.getElementById('pv-list').style.display = 'none';
+  document.getElementById('pv-detail').style.display = '';
+
+  const prop = data.properties.find(p => p.id === propId);
+  const propName = prop?.name || 'Unknown';
+  document.getElementById('pv-detail-name').textContent = propName;
+
+  const plData = (data.pricelabs_matched || {})[propId];
+  const feeData = (data.management_fees || {})[propId];
+
+  // All reservations for this property (for YoY chart and byYear context)
+  const allPropRes = data.reservations.filter(r => r.properties?.[0]?.id === propId && r.financials?.host?.revenue?.amount != null);
+
+  // Build byYear grouped by checkout year (for YoY chart + insights)
+  const byYear = {};
+  allPropRes.forEach(r => {
+    const rev = r.financials.host.revenue.amount / 100;
+    const yr = (r.departure_date || r.check_out || '').substring(0, 4);
+    if (!byYear[yr]) byYear[yr] = { revenue: 0, bookings: 0, nights: 0 };
+    byYear[yr].revenue += rev; byYear[yr].bookings++; byYear[yr].nights += r.nights || 0;
+  });
+
+  // Filter by checkout year; bucket monthly revenue by checkout date
+  const filteredRes = yearFilter === 'all' ? allPropRes : allPropRes.filter(r => (r.departure_date || r.check_out || '').startsWith(yearFilter));
+  const byMonth = {};
+  filteredRes.forEach(r => {
+    const rev = r.financials.host.revenue.amount / 100;
+    const cleaning = (r.financials.host?.guest_fees || []).filter(f => /cleaning fee/i.test(f.label || '')).reduce((s, f) => s + (f.amount || 0), 0) / 100;
+    const mo = (r.departure_date || r.check_out || '').substring(0, 7);
+    if (!byMonth[mo]) byMonth[mo] = { revenue: 0, bookings: 0, nights: 0, cleaningFee: 0 };
+    byMonth[mo].revenue += rev; byMonth[mo].bookings++; byMonth[mo].nights += r.nights || 0; byMonth[mo].cleaningFee += cleaning;
+  });
+
+  const totalRev = filteredRes.reduce((s, r) => s + r.financials.host.revenue.amount / 100, 0);
+  const totalCleaning = filteredRes.reduce((s, r) => s + (r.financials.host?.guest_fees || []).filter(f => /cleaning fee/i.test(f.label || '')).reduce((a, f) => a + (f.amount || 0), 0) / 100, 0);
+  const totalNights = filteredRes.reduce((s, r) => s + (r.nights || 0), 0);
+  const totalBookings = filteredRes.length;
+  const anr = totalNights > 0 ? totalRev / totalNights : 0;
+  const abv = totalBookings > 0 ? totalRev / totalBookings : 0;
+  const periodLabel = yearFilter === 'all' ? 'All time' : yearFilter;
+
+  // ── Financial KPIs ──
+  const rev2024 = byYear['2024']?.revenue || 0;
+  const rev2025 = byYear['2025']?.revenue || 0;
+  let yoyHtml = '';
+  if (rev2024 > 0 && rev2025 > 0) {
+    const yoy = (rev2025 - rev2024) / rev2024 * 100;
+    yoyHtml = `<div class="kpi ${yoy >= 0 ? 'green' : 'orange'}"><div class="label">YoY Growth</div><div class="value">${yoy >= 0 ? '+' : ''}${yoy.toFixed(0)}%</div><div class="sub">2024→2025</div></div>`;
+  }
+  document.getElementById('pv-fin-kpis').innerHTML = `
+    <div class="kpi green"><div class="label">Total Revenue</div><div class="value">${fmt(totalRev)}</div><div class="sub">${periodLabel}</div></div>
+    <div class="kpi blue"><div class="label">Bookings</div><div class="value">${totalBookings}</div><div class="sub">${periodLabel}</div></div>
+    <div class="kpi purple"><div class="label">Total Nights</div><div class="value">${totalNights}</div><div class="sub">${periodLabel}</div></div>
+    <div class="kpi orange"><div class="label">Avg Nightly Rate</div><div class="value">${fmt(anr)}</div><div class="sub">Rev ÷ nights</div></div>
+    <div class="kpi"><div class="label">Avg Booking Value</div><div class="value">${fmt(abv)}</div><div class="sub">Rev ÷ bookings</div></div>
+    ${yoyHtml}`;
+
+  // Monthly revenue chart (filtered year)
+  const months = Object.keys(byMonth).sort();
+  const fmtMo = m => { const [y,mo] = m.split('-'); return new Date(+y,+mo-1).toLocaleString('en',{month:'short',year:'numeric'}); };
+  _pvCharts.pdMonthlyChart = new Chart(document.getElementById('pdMonthlyChart'), {
+    type: 'bar',
+    data: { labels: months.map(fmtMo), datasets: [{ label: 'Revenue', data: months.map(m => byMonth[m].revenue), backgroundColor: '#6366f1', borderRadius: 4 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#6b7280', callback: v => fmtShort(v) }, grid: { color: '#2d3148' } }, x: { ticks: { color: '#6b7280' }, grid: { display: false } } } }
+  });
+
+  // Revenue by year chart (always all years for context)
+  const allYears = Object.keys(byYear).sort();
+  _pvCharts.pdYoyChart = new Chart(document.getElementById('pdYoyChart'), {
+    type: 'bar',
+    data: { labels: allYears, datasets: [{ label: 'Revenue', data: allYears.map(y => byYear[y].revenue), backgroundColor: allYears.map((_, i) => COLORS[i]), borderRadius: 4 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#6b7280', callback: v => fmtShort(v) }, grid: { color: '#2d3148' } }, x: { ticks: { color: '#6b7280' }, grid: { display: false } } } }
+  });
+
+  // ── Occupancy & Pricing KPIs ──
+  const occ30 = pct(plData?.occupancy_next_30), mocc30 = pct(plData?.market_occupancy_next_30);
+  const occ60 = pct(plData?.occupancy_next_60), mocc60 = pct(plData?.market_occupancy_next_60);
+  const occ90 = pct(plData?.occupancy_next_90), mocc90 = pct(plData?.market_occupancy_next_90);
+  const mpi30 = plData?.mpi_next_30, mpi60 = plData?.mpi_next_60;
+  const base = plData?.base, minP = plData?.min, maxP = plData?.max;
+  const mpiColor = mpi30 != null ? (mpi30 >= 1.2 ? '#34d399' : mpi30 >= 1 ? '#facc15' : '#f87171') : '';
+
+  document.getElementById('pv-occ-kpis').innerHTML = `
+    <div class="kpi blue"><div class="label">Occ Next 30d</div><div class="value">${occ30 != null ? occ30 + '%' : '—'}</div><div class="sub">Mkt: ${mocc30 != null ? mocc30 + '%' : '—'}</div></div>
+    <div class="kpi orange"><div class="label">Occ Next 60d</div><div class="value">${occ60 != null ? occ60 + '%' : '—'}</div><div class="sub">Mkt: ${mocc60 != null ? mocc60 + '%' : '—'}</div></div>
+    <div class="kpi teal"><div class="label">Occ Next 90d</div><div class="value">${occ90 != null ? occ90 + '%' : '—'}</div><div class="sub">Mkt: ${mocc90 != null ? mocc90 + '%' : '—'}</div></div>
+    <div class="kpi purple"><div class="label">MPI 30d</div><div class="value" style="color:${mpiColor}">${mpi30 != null ? mpi30.toFixed(2) : '—'}</div><div class="sub">MPI 60d: ${mpi60 != null ? mpi60.toFixed(2) : '—'}</div></div>
+    <div class="kpi"><div class="label">Base Price</div><div class="value">${base ? fmt(base) : '—'}</div><div class="sub">PriceLabs base</div></div>
+    <div class="kpi green"><div class="label">Price Range</div><div class="value" style="font-size:1.1rem">${minP ? fmt(minP) : '—'} – ${maxP ? fmt(maxP) : '∞'}</div><div class="sub">Min / Max</div></div>`;
+
+  // Occ vs Market chart
+  _pvCharts.pdOccChart = new Chart(document.getElementById('pdOccChart'), {
+    type: 'bar',
+    data: { labels: ['Next 30d', 'Next 60d', 'Next 90d'], datasets: [
+      { label: 'Listing', data: [occ30, occ60, occ90], backgroundColor: '#6366f1', borderRadius: 4 },
+      { label: 'Market',  data: [mocc30, mocc60, mocc90], backgroundColor: '#2d3148', borderRadius: 4 }
+    ]},
+    options: { responsive: true, scales: { y: { max: 100, ticks: { color: '#6b7280', callback: v => v + '%' }, grid: { color: '#2d3148' } }, x: { ticks: { color: '#6b7280' }, grid: { display: false } } }, plugins: { legend: { labels: { color: '#9ca3af', boxWidth: 12 } } } }
+  });
+
+  // Price comparison chart
+  const priceLabels = [], priceData = [], priceColors = [];
+  if (minP) { priceLabels.push('Min'); priceData.push(minP); priceColors.push('#60a5fa'); }
+  if (base) { priceLabels.push('Base'); priceData.push(base); priceColors.push('#6366f1'); }
+  if (anr)  { priceLabels.push('Actual ANR'); priceData.push(anr); priceColors.push('#34d399'); }
+  if (maxP) { priceLabels.push('Max'); priceData.push(maxP); priceColors.push('#fb923c'); }
+  _pvCharts.pdPriceChart = new Chart(document.getElementById('pdPriceChart'), {
+    type: 'bar',
+    data: { labels: priceLabels, datasets: [{ data: priceData, backgroundColor: priceColors, borderRadius: 4 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { ticks: { color: '#6b7280', callback: v => fmtShort(v) }, grid: { color: '#2d3148' } }, x: { ticks: { color: '#6b7280' }, grid: { display: false } } } }
+  });
+
+  // ── Gross Profit KPIs (filtered year) ──
+  const feePct = feeData?.value;
+  const mgmtFeeYr  = feePct ? totalRev * feePct / 100 : null;
+  const mgmtHstYr  = mgmtFeeYr != null ? mgmtFeeYr * MGMT_FEE_HST : null;
+  const ownerYr    = mgmtFeeYr != null ? totalRev - totalCleaning - mgmtFeeYr - mgmtHstYr : null;
+
+  document.getElementById('pv-gp-kpis').innerHTML = `
+    <div class="kpi purple"><div class="label">Mgmt Fee %</div><div class="value">${feePct != null ? feePct + '%' : '—'}</div><div class="sub">Rate</div></div>
+    <div class="kpi green"><div class="label">Mgmt Fee Earned</div><div class="value">${mgmtFeeYr != null ? fmt(mgmtFeeYr) : '—'}</div><div class="sub">${periodLabel}</div></div>
+    <div class="kpi orange"><div class="label">HST on Mgmt Fee</div><div class="value">${mgmtHstYr != null ? fmt(mgmtHstYr) : '—'}</div><div class="sub">13%</div></div>
+    <div class="kpi muted"><div class="label">Cleaning Fees</div><div class="value">${totalCleaning > 0 ? fmt(totalCleaning) : '—'}</div><div class="sub">${periodLabel}</div></div>
+    <div class="kpi blue"><div class="label">Owner Payout</div><div class="value">${ownerYr != null ? fmt(ownerYr) : '—'}</div><div class="sub">Rev − cleaning − mgmt − HST</div></div>`;
+
+  // Monthly GP chart (filtered year)
+  _pvCharts.pdGpChart = new Chart(document.getElementById('pdGpChart'), {
+    type: 'bar',
+    data: { labels: months.map(fmtMo), datasets: feePct ? [
+      { label: 'Cleaning Fee', data: months.map(m => byMonth[m].cleaningFee || 0), backgroundColor: '#94a3b8', borderRadius: 4 },
+      { label: 'Mgmt Fee',     data: months.map(m => byMonth[m].revenue * feePct / 100), backgroundColor: '#a78bfa', borderRadius: 4 },
+      { label: 'HST (13%)',    data: months.map(m => byMonth[m].revenue * feePct / 100 * MGMT_FEE_HST), backgroundColor: '#f472b6', borderRadius: 4 },
+      { label: 'Owner Payout', data: months.map(m => byMonth[m].revenue - (byMonth[m].cleaningFee || 0) - byMonth[m].revenue * feePct / 100 * (1 + MGMT_FEE_HST)), backgroundColor: '#60a5fa', borderRadius: 4 }
+    ] : [
+      { label: 'Revenue', data: months.map(m => byMonth[m].revenue), backgroundColor: '#6366f1', borderRadius: 4 }
+    ]},
+    options: { responsive: true, plugins: { legend: { labels: { color: '#9ca3af', boxWidth: 12 } } }, scales: { x: { stacked: true, ticks: { color: '#6b7280' }, grid: { display: false } }, y: { stacked: true, ticks: { color: '#6b7280', callback: v => fmtShort(v) }, grid: { color: '#2d3148' } } } }
+  });
+
+  // ── Insights ──
+  const insight = generateInsights(propId, propName, plData, byYear, byYear['2024'], byYear['2025'], feeData);
+  const statusLabel = insight.status === 'healthy' ? 'Healthy' : insight.status === 'monitor' ? 'Monitor' : 'Action Required';
+  const badge = document.getElementById('pv-detail-badge');
+  badge.className = `badge ${insight.status}`;
+  badge.textContent = statusLabel;
+  document.getElementById('pv-insight-card').innerHTML = `
+    <div class="insight-card ${insight.status}" style="max-width:none">
+      <ul class="ic-recs">${insight.recs.map(r => `<li class="${r.type}">${r.text}</li>`).join('')}</ul>
+    </div>`;
+}
+
+// ── Overview ──────────────────────────────────────────────────────────────────
+let _ovCharts = {};
+
+function renderOverview(data, yearFilter) {
+  const curYear     = yearFilter === 'all' ? null : yearFilter;
+  const prevYear    = curYear ? String(parseInt(curYear) - 1) : null;
+  const annualTarget = (data.annual_targets || {})[curYear] || null;
+  const monthNames  = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const targets     = data.revenue_targets || {};
+  const fees        = data.management_fees || {};
+  const MGMT_HST    = 0.13;
+
+  // ── Build actuals using departure date ──────────────────────────────────────
+  const portActual   = new Array(12).fill(0);
+  const portProjected = new Array(12).fill(null);
+  let totalRev = 0, totalClean = 0, totalMgmt = 0, totalNights = 0, totalBookings = 0;
+  let prevTotalRev = 0;
+
+  const byPropMo = {};
+  data.reservations.forEach(r => {
+    const dep = (r.departure_date || r.check_out || '');
+    if (!dep) return;
+    const yr = dep.substring(0,4);
+    const mo = parseInt(dep.substring(5,7), 10);
+    const pid = (r.properties || [{}])[0]?.id || '';
+    const rev = ((r.financials?.host?.revenue?.amount) || 0) / 100;
+    if (!rev || !pid) return;
+    const nights  = r.nights || 0;
+    const cleaning = ((r.financials?.host?.guest_fees || []).filter(f => /cleaning/i.test(f.label||'')).reduce((s,f) => s+(f.amount||0),0)) / 100;
+    if (curYear && yr === curYear) {
+      portActual[mo-1] += rev;
+      totalRev    += rev;
+      totalClean  += cleaning;
+      totalNights += nights;
+      totalBookings++;
+      const fee = fees[pid];
+      if (fee) totalMgmt += rev * (fee.value/100);
+      if (!byPropMo[pid]) byPropMo[pid] = {};
+      if (!byPropMo[pid][mo]) byPropMo[pid][mo] = { rev:0, nights:0 };
+      byPropMo[pid][mo].rev += rev;
+      byPropMo[pid][mo].nights += nights;
+    }
+    if (prevYear && yr === prevYear) prevTotalRev += rev;
+  });
+
+  // Portfolio projections per month
+  data.properties.forEach(p => {
+    const pt = targets[p.id] || {};
+    for (let mo = 1; mo <= 12; mo++) {
+      const t = pt[mo];
+      if (t && !t.closed && t.revenue_target) {
+        portProjected[mo-1] = (portProjected[mo-1] || 0) + t.revenue_target;
+      }
+    }
+  });
+
+  // ── Annual target progress ───────────────────────────────────────────────────
+  if (annualTarget) {
+    const pct = Math.min(totalRev / annualTarget * 100, 100);
+    const gap = annualTarget - totalRev;
+    document.getElementById('ov-actual').textContent = fmtShort(totalRev);
+    document.getElementById('ov-goal').textContent   = `of ${fmtShort(annualTarget)}`;
+    document.getElementById('ov-pct').textContent    = pct.toFixed(1) + '% achieved';
+    document.getElementById('ov-progress-fill').style.width = pct.toFixed(1) + '%';
+    document.getElementById('ov-progress-left').textContent = `${fmtShort(gap)} remaining`;
+    document.getElementById('ov-progress-right').textContent = `Target: ${fmtShort(annualTarget)}`;
+  } else {
+    document.getElementById('ov-goal').textContent = 'No annual target set';
+  }
+
+  // ── Portfolio KPIs ───────────────────────────────────────────────────────────
+  const anr      = totalNights > 0 ? totalRev / totalNights : 0;
+  const hstMgmt  = totalMgmt * MGMT_HST;
+  const ownerPay = totalRev - totalClean - totalMgmt - hstMgmt;
+  const yoyAmt   = prevTotalRev ? totalRev - prevTotalRev : null;
+  const yoyPct   = prevTotalRev ? yoyAmt / prevTotalRev * 100 : null;
+  const yoyColor = yoyAmt != null && yoyAmt >= 0 ? '#34d399' : '#f87171';
+
+  // Occ metrics from PriceLabs
+  const pl = data.pricelabs_matched || {};
+  let occ30s = [], occ60s = [], mkt30s = [];
+  data.properties.forEach(p => {
+    const plD = pl[p.id];
+    if (!plD) return;
+    if (plD.occ_next_30 != null) occ30s.push(plD.occ_next_30);
+    if (plD.occ_next_60 != null) occ60s.push(plD.occ_next_60);
+    if (plD.market_occ_next_30 != null) mkt30s.push(plD.market_occ_next_30);
+  });
+  const avgOcc30 = occ30s.length ? Math.round(occ30s.reduce((s,v)=>s+v,0)/occ30s.length) : null;
+  const avgOcc60 = occ60s.length ? Math.round(occ60s.reduce((s,v)=>s+v,0)/occ60s.length) : null;
+  const avgMkt30 = mkt30s.length ? Math.round(mkt30s.reduce((s,v)=>s+v,0)/mkt30s.length) : null;
+  const occDelta = avgOcc30 != null && avgMkt30 != null ? avgOcc30 - avgMkt30 : null;
+  const occColor = occDelta == null ? '#fff' : occDelta >= 0 ? '#34d399' : '#f87171';
+
+  document.getElementById('ov-kpi-grid').innerHTML = `
+    <div class="kpi green"><div class="label">Revenue YTD</div><div class="value">${fmtShort(totalRev)}</div><div class="sub">${curYear || 'All time'} host net</div></div>
+    <div class="kpi"><div class="label">Mgmt Fee Earned</div><div class="value" style="color:#a78bfa">${fmtShort(totalMgmt)}</div><div class="sub">Your gross income</div></div>
+    <div class="kpi blue"><div class="label">Owner Payout</div><div class="value">${fmtShort(ownerPay)}</div><div class="sub">After fees & cleaning</div></div>
+    <div class="kpi"><div class="label">Avg Occ 30d</div><div class="value" style="color:${occColor}">${avgOcc30 != null ? avgOcc30+'%' : '—'}</div><div class="sub">${occDelta != null ? (occDelta>=0?'+':'')+occDelta+'% vs market '+avgMkt30+'%' : 'vs market'}</div></div>
+    <div class="kpi"><div class="label">Avg Occ 60d</div><div class="value" style="color:#fb923c">${avgOcc60 != null ? avgOcc60+'%' : '—'}</div><div class="sub">Next 60 days</div></div>
+    <div class="kpi"><div class="label">Avg Nightly Rate</div><div class="value" style="color:#2dd4bf">${anr ? fmt(anr) : '—'}</div><div class="sub">Revenue ÷ nights</div></div>
+    <div class="kpi"><div class="label">vs ${prevYear||'Prev Year'}</div><div class="value" style="color:${yoyColor}">${yoyAmt!=null?(yoyAmt>=0?'+':'')+fmtShort(yoyAmt):'—'}</div><div class="sub">${yoyPct!=null?(yoyPct>=0?'+':'')+yoyPct.toFixed(1)+'% YoY':'No prior data'}</div></div>
+    <div class="kpi"><div class="label">Bookings</div><div class="value" style="color:#60a5fa">${totalBookings}</div><div class="sub">Accepted ${curYear||''}</div></div>
+  `;
+
+  // ── Status counts from cached insights ──────────────────────────────────────
+  const cards = window._insightCards || [];
+  const nAction  = cards.filter(c => c.insight.status === 'action').length;
+  const nMonitor = cards.filter(c => c.insight.status === 'monitor').length;
+  const nHealthy = cards.filter(c => c.insight.status === 'healthy').length;
+  document.getElementById('ov-count-action').textContent  = nAction;
+  document.getElementById('ov-count-monitor').textContent = nMonitor;
+  document.getElementById('ov-count-healthy').textContent = nHealthy;
+
+  // ── Attention table (action + monitor) ──────────────────────────────────────
+  const attnCards = cards.filter(c => c.insight.status !== 'healthy');
+  document.getElementById('ov-attn-count').textContent = `(${attnCards.length} of ${cards.length} properties)`;
+  const tbody = document.getElementById('ovAttnBody');
+  tbody.innerHTML = attnCards.map(({ id, name, insight }) => {
+    const { status, recs, occ30, mocc30, mpi30, yoyRev, pickup } = insight;
+    const occDeltaRow = (occ30 != null && mocc30 != null) ? occ30 - mocc30 : null;
+    const occColor2   = occDeltaRow == null ? '' : occDeltaRow >= 0 ? 'positive' : 'negative';
+    const mpiColor    = mpi30 == null ? '' : mpi30 >= 1 ? 'positive' : mpi30 < 0.7 ? 'negative' : '';
+    const yoyColor2   = yoyRev == null ? '' : yoyRev >= 0 ? 'positive' : 'negative';
+    const topRec      = recs.find(r => r.type === 'urgent') || recs.find(r => r.type === 'warning') || recs[0];
+    const badgeColor  = status === 'action' ? '#f87171' : '#facc15';
+    const badgeBg     = status === 'action' ? '#3b1a1a' : '#2a2010';
+    return `<tr onclick="ovDrillProp('${id}')">
+      <td><strong>${name}</strong></td>
+      <td><span class="status-dot ${status}"></span><span style="color:${badgeColor};font-size:0.72rem;font-weight:700;text-transform:uppercase">${status === 'action' ? 'Action Required' : 'Monitor'}</span></td>
+      <td class="num">${occ30 != null ? occ30+'%' : '—'}</td>
+      <td class="num ${occColor2}">${occDeltaRow != null ? (occDeltaRow>=0?'+':'')+occDeltaRow+'%' : '—'}</td>
+      <td class="num ${mpiColor}">${mpi30 != null ? mpi30.toFixed(2) : '—'}</td>
+      <td class="num ${yoyColor2}">${yoyRev != null ? (yoyRev>=0?'+':'')+yoyRev.toFixed(0)+'%' : '—'}</td>
+      <td class="num">${pickup != null ? pickup : '—'}</td>
+      <td class="rec-text">${topRec ? topRec.text : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  // ── Charts ──────────────────────────────────────────────────────────────────
+  ['ovMonthlyChart','ovPlatformChart'].forEach(id => {
+    if (_ovCharts[id]) { _ovCharts[id].destroy(); delete _ovCharts[id]; }
+  });
+
+  // Monthly revenue vs projected
+  const ctxM = document.getElementById('ovMonthlyChart');
+  if (ctxM) {
+    _ovCharts.ovMonthlyChart = new Chart(ctxM, {
+      type: 'bar',
+      data: {
+        labels: monthNames,
+        datasets: [
+          {
+            label: 'Actual Revenue',
+            data: portActual,
+            backgroundColor: portActual.map((a,i) =>
+              portProjected[i] == null ? '#6366f1aa' : a >= portProjected[i] ? '#34d39988' : '#f8717188'),
+            borderRadius: 4, order: 1
+          },
+          {
+            label: 'Projected',
+            data: portProjected, type: 'line',
+            borderColor: '#facc15', backgroundColor: 'transparent',
+            borderWidth: 2, borderDash: [5,4],
+            pointBackgroundColor: '#facc15', pointRadius: 3, tension: 0.3, order: 0
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { labels: { color: '#9ca3af', font: { size: 11 } } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmtShort(c.raw)}` } } },
+        scales: { x: { ticks: { color: '#6b7280' }, grid: { display: false } }, y: { ticks: { color: '#6b7280', callback: v => fmtShort(v) }, grid: { color: '#2d3148' } } }
+      }
+    });
+  }
+
+  // Platform doughnut
+  const platData = {};
+  data.reservations.forEach(r => {
+    const dep = (r.departure_date || r.check_out || '');
+    if (curYear && !dep.startsWith(curYear)) return;
+    const rev = ((r.financials?.host?.revenue?.amount) || 0) / 100;
+    if (!rev) return;
+    const plat = r.platform || 'other';
+    platData[plat] = (platData[plat] || 0) + rev;
+  });
+  const platLabels = Object.keys(platData).sort((a,b) => platData[b]-platData[a]);
+  const platColors = ['#6366f1','#34d399','#fb923c','#60a5fa','#a78bfa','#f87171','#2dd4bf'];
+  const ctxP = document.getElementById('ovPlatformChart');
+  if (ctxP && platLabels.length) {
+    _ovCharts.ovPlatformChart = new Chart(ctxP, {
+      type: 'doughnut',
+      data: { labels: platLabels, datasets: [{ data: platLabels.map(l => platData[l]), backgroundColor: platColors, borderWidth: 0, hoverOffset: 4 }] },
+      options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 11 }, padding: 12 } }, tooltip: { callbacks: { label: c => `${c.label}: ${fmtShort(c.raw)} (${(c.raw/totalRev*100).toFixed(1)}%)` } } } }
+    });
+  }
+}
+
+function ovJumpToStatus(status) {
+  // Switch to Properties (Insights) tab and filter
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const tab = document.querySelector('[data-page="insights"]');
+  if (tab) tab.classList.add('active');
+  document.getElementById('page-insights').classList.add('active');
+  // Apply filter
+  const btn = document.querySelector(`.insights-filter button[data-status="${status}"]`);
+  if (btn) btn.click();
+}
+
+function ovDrillProp(propId) {
+  // Switch to Property View and open that property
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const tab = document.querySelector('[data-page="propview"]');
+  if (tab) tab.classList.add('active');
+  document.getElementById('page-propview').classList.add('active');
+  // Find and click the card for this property
+  const card = document.querySelector(`[data-propid="${propId}"]`);
+  if (card) card.click();
+}
+
+// ── Targets ───────────────────────────────────────────────────────────────────
+let _tgtChart = null;
+let _tgtRows  = [];
+
+function renderTargets(data, yearFilter) {
+  const targets      = data.revenue_targets || {};
+  const annualTgts   = data.annual_targets  || {};
+  const props        = data.properties || [];
+  const monthNames   = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const daysInMo     = [31,28,31,30,31,30,31,31,30,31,30,31];
+  const curYear      = yearFilter === 'all' ? null : yearFilter;
+  const prevYear     = curYear ? String(parseInt(curYear) - 1) : null;
+  const annualTarget = curYear ? (annualTgts[curYear] || null) : null;  // e.g. 2300000
+
+  function buildActuals(reservations, year) {
+    const byPropMo = {};
+    reservations.forEach(r => {
+      const dep = (r.departure_date || r.check_out || '');
+      if (!dep || (year && !dep.startsWith(year))) return;
+      const mo  = parseInt(dep.substring(5, 7), 10);
+      const pid = (r.properties || [{}])[0]?.id || '';
+      if (!pid) return;
+      const rev = ((r.financials?.host?.revenue?.amount) || 0) / 100;
+      if (!rev) return;
+      if (!byPropMo[pid]) byPropMo[pid] = {};
+      if (!byPropMo[pid][mo]) byPropMo[pid][mo] = { rev: 0, nights: 0 };
+      byPropMo[pid][mo].rev    += rev;
+      byPropMo[pid][mo].nights += (r.nights || 0);
+    });
+    return byPropMo;
+  }
+
+  const curActuals  = buildActuals(data.reservations, curYear);
+  const prevActuals = buildActuals(data.reservations, prevYear);
+
+  // Monthly portfolio aggregates
+  const portActual   = new Array(12).fill(0);
+  const portProjected = new Array(12).fill(null);  // from CSV (per-property projections)
+
+  props.forEach(p => {
+    const pid = p.id;
+    const pt  = targets[pid] || {};
+    for (let mo = 1; mo <= 12; mo++) {
+      portActual[mo-1] += (curActuals[pid] || {})[mo]?.rev || 0;
+      const t = pt[mo];
+      if (t && !t.closed && t.revenue_target) {
+        portProjected[mo-1] = (portProjected[mo-1] || 0) + t.revenue_target;
+      }
+    }
+  });
+
+  // Annual target spread evenly across open months for the chart line
+  const openMonthCount = portProjected.filter(v => v != null).length;
+  const annualPerMonth = annualTarget && openMonthCount
+    ? portProjected.map(v => v != null ? annualTarget / openMonthCount : null)
+    : new Array(12).fill(null);
+
+  // Chart
+  if (_tgtChart) { _tgtChart.destroy(); _tgtChart = null; }
+  const ctx = document.getElementById('tgtPortfolioChart');
+  if (ctx) {
+    _tgtChart = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: monthNames,
+        datasets: [
+          {
+            label: 'Actual Revenue',
+            data: portActual,
+            backgroundColor: portActual.map((a, i) => {
+              const ref = portProjected[i];
+              if (ref == null) return '#6366f1aa';
+              return a >= ref ? '#34d39988' : '#f8717188';
+            }),
+            borderRadius: 4,
+            order: 2,
+          },
+          {
+            label: 'Projected (per property)',
+            data: portProjected,
+            type: 'line',
+            borderColor: '#facc15',
+            backgroundColor: 'transparent',
+            borderWidth: 2,
+            borderDash: [5, 4],
+            pointBackgroundColor: '#facc15',
+            pointRadius: 4,
+            tension: 0.3,
+            order: 1,
+          },
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: {
+          legend: { labels: { color: '#9ca3af', font: { size: 11 } } },
+          tooltip: { callbacks: { label: c => `${c.dataset.label}: ${fmtShort(c.raw)}` } }
+        },
+        scales: {
+          x: { ticks: { color: '#6b7280' }, grid: { display: false } },
+          y: { ticks: { color: '#6b7280', callback: v => fmtShort(v) }, grid: { color: '#2d3148' } }
+        }
+      }
+    });
+  }
+
+  // KPIs
+  const totalActual    = portActual.reduce((s,v) => s+v, 0);
+  const totalProjected = portProjected.reduce((s,v) => s+(v||0), 0);
+  const varVsProj      = totalActual - totalProjected;
+  const varVsProjPct   = totalProjected ? varVsProj / totalProjected * 100 : null;
+  const varVsAnnual    = annualTarget ? totalActual - annualTarget : null;
+  const varVsAnnualPct = annualTarget ? varVsAnnual / annualTarget * 100 : null;
+  const prevTotal      = props.reduce((s,p) => {
+    const pid = p.id;
+    for (let mo = 1; mo <= 12; mo++) s += (prevActuals[pid] || {})[mo]?.rev || 0;
+    return s;
+  }, 0);
+  const yoyAmt  = prevTotal ? totalActual - prevTotal : null;
+  const yoyPct  = prevTotal ? yoyAmt / prevTotal * 100 : null;
+  const moAhead = portProjected.filter((t,i) => t != null && portActual[i] >= t).length;
+  const moBehind= portProjected.filter((t,i) => t != null && portActual[i] < t).length;
+
+  const projColor   = varVsProj   >= 0 ? '#34d399' : '#f87171';
+  const annualColor = varVsAnnual != null && varVsAnnual >= 0 ? '#34d399' : '#f87171';
+  const yoyColor    = yoyAmt != null && yoyAmt >= 0 ? '#34d399' : '#f87171';
+  const pctToAnnual = annualTarget ? (totalActual / annualTarget * 100).toFixed(1) : null;
+
+  document.getElementById('tgt-kpi-grid').innerHTML = `
+    <div class="kpi green"><div class="label">Actual Revenue</div><div class="value">${fmtShort(totalActual)}</div><div class="sub">${curYear || 'All years'}</div></div>
+    <div class="kpi"><div class="label">Annual Target</div><div class="value" style="color:#a78bfa">${annualTarget ? fmtShort(annualTarget) : '—'}</div><div class="sub">${pctToAnnual ? pctToAnnual + '% achieved' : 'Not set'}</div></div>
+    <div class="kpi"><div class="label">vs Annual Target</div><div class="value" style="color:${annualColor}">${varVsAnnual != null ? (varVsAnnual >= 0 ? '+' : '') + fmtShort(varVsAnnual) : '—'}</div><div class="sub">${varVsAnnualPct != null ? (varVsAnnualPct >= 0 ? '+' : '') + varVsAnnualPct.toFixed(1) + '%' : '—'}</div></div>
+    <div class="kpi"><div class="label">Projected (CSV)</div><div class="value" style="color:#facc15">${fmtShort(totalProjected)}</div><div class="sub">Sum of property forecasts</div></div>
+    <div class="kpi"><div class="label">vs Projected</div><div class="value" style="color:${projColor}">${varVsProj >= 0 ? '+' : ''}${fmtShort(varVsProj)}</div><div class="sub">${varVsProjPct != null ? (varVsProjPct >= 0 ? '+' : '') + varVsProjPct.toFixed(1) + '% vs forecast' : '—'}</div></div>
+    <div class="kpi"><div class="label">vs ${prevYear || 'Prev Year'}</div><div class="value" style="color:${yoyColor}">${yoyAmt != null ? (yoyAmt >= 0 ? '+' : '') + fmtShort(yoyAmt) : '—'}</div><div class="sub">${yoyPct != null ? (yoyPct >= 0 ? '+' : '') + yoyPct.toFixed(1) + '% YoY' : 'No prior data'}</div></div>
+    <div class="kpi blue"><div class="label">Months Ahead</div><div class="value">${moAhead}</div><div class="sub">of forecast</div></div>
+    <div class="kpi orange"><div class="label">Months Behind</div><div class="value">${moBehind}</div><div class="sub">Need attention</div></div>
+  `;
+
+  // Per-property per-month rows
+  _tgtRows = [];
+  [...props].sort((a,b) => a.name.localeCompare(b.name)).forEach(p => {
+    const pid = p.id;
+    const pt  = targets[pid] || {};
+    for (let mo = 1; mo <= 12; mo++) {
+      const tgt       = pt[mo] || {};
+      const act       = (curActuals[pid] || {})[mo] || {};
+      const prev      = (prevActuals[pid] || {})[mo] || {};
+      const actRev    = act.rev || 0;
+      const actNights = act.nights || 0;
+      const days      = daysInMo[mo-1];
+      const actOcc    = actNights ? Math.round(actNights / days * 100) : null;
+      const prevRev   = prev.rev || 0;
+      const projRev   = tgt.revenue_target;   // projected/forecast from CSV
+      const occTgt    = tgt.occupancy_target;
+      const closed    = tgt.closed || false;
+
+      if (!actRev && !prevRev && !projRev && !occTgt && !closed) continue;
+
+      const revVar  = projRev != null ? actRev - projRev : null;
+      const revVarP = projRev ? revVar / projRev * 100 : null;
+      const occVar  = occTgt != null && actOcc != null ? actOcc - occTgt : null;
+      const yoyRevV = prevRev ? actRev - prevRev : null;
+      const yoyRevP = prevRev ? yoyRevV / prevRev * 100 : null;
+
+      let status = 'no-tgt';
+      if (closed) status = 'closed';
+      else if (projRev != null) status = actRev >= projRev ? 'ahead' : 'behind';
+
+      _tgtRows.push({ pid, name: p.name, mo, actRev, actOcc, projRev, occTgt, revVar, revVarP, occVar, prevRev, yoyRevV, yoyRevP, closed, status });
+    }
+  });
+
+  tgtRenderTable('all');
+}
+
+function tgtRenderTable(filter) {
+  const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const rows = filter === 'all' ? _tgtRows : _tgtRows.filter(r => r.status === filter);
+  const tbody = document.getElementById('tgtTable');
+  if (!tbody) return;
+
+  tbody.innerHTML = rows.map(r => {
+    const revColor = r.revVar == null ? '' : r.revVar >= 0 ? 'class="positive"' : 'class="negative"';
+    const occColor = r.occVar == null ? '' : r.occVar >= 0 ? 'class="positive"' : 'class="negative"';
+    const yoyColor = r.yoyRevV == null ? '' : r.yoyRevV >= 0 ? 'class="positive"' : 'class="negative"';
+    const pct = v => v != null ? (v >= 0 ? '+' : '') + v.toFixed(1) + '%' : '—';
+    const pill = `<span class="tgt-pill ${r.status}">${r.status === 'no-tgt' ? 'No Forecast' : r.status.charAt(0).toUpperCase() + r.status.slice(1)}</span>`;
+    return `<tr data-status="${r.status}">
+      <td>${r.name}</td>
+      <td>${monthNames[r.mo-1]}</td>
+      <td class="num">${r.actRev ? fmt(r.actRev) : r.closed ? '<span class="muted">Closed</span>' : '—'}</td>
+      <td class="num">${r.projRev != null ? fmt(r.projRev) : r.closed ? '<span class="muted">Closed</span>' : '<span class="muted">—</span>'}</td>
+      <td class="num" ${revColor}>${r.revVar != null ? (r.revVar >= 0 ? '+' : '') + fmt(r.revVar) : '—'}</td>
+      <td class="num" ${revColor}>${pct(r.revVarP)}</td>
+      <td class="num">${r.actOcc != null ? r.actOcc + '%' : '—'}</td>
+      <td class="num">${r.occTgt != null ? r.occTgt + '%' : r.closed ? '<span class="muted">Closed</span>' : '<span class="muted">—</span>'}</td>
+      <td class="num" ${occColor}>${r.occVar != null ? (r.occVar >= 0 ? '+' : '') + r.occVar.toFixed(1) + '%' : '—'}</td>
+      <td class="num">${r.prevRev ? fmt(r.prevRev) : '—'}</td>
+      <td class="num" ${yoyColor}>${r.yoyRevV != null ? (r.yoyRevV >= 0 ? '+' : '') + fmt(r.yoyRevV) : '—'}</td>
+      <td class="num" ${yoyColor}>${pct(r.yoyRevP)}</td>
+      <td>${pill}</td>
+    </tr>`;
+  }).join('');
+}
+
+function tgtFilterClick(btn) {
+  document.querySelectorAll('.tgt-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  tgtRenderTable(btn.dataset.tgtFilter);
+}
+
+// ── Main render dispatch ─────────────────────────────────────────────────────
+function renderAll() {
+  const year = document.getElementById('yearFilter').value;
+  const prop = document.getElementById('propertyFilter').value;
+  const plat = document.getElementById('platformFilter').value;
+  // Insights must run first — Overview consumes window._insightCards
+  renderInsights(rawData);
+  renderOverview(rawData, year);
+  renderFinancials(rawData, year, prop, plat);
+  renderOccupancy(rawData, prop);
+  renderPropertiesTable(rawData, year, prop, plat);
+  renderGrossProfit(rawData, year, prop, plat);
+  renderPropertyList(rawData, year);
+  renderTargets(rawData, year);
+}
+
+// ── Init ─────────────────────────────────────────────────────────────────────
+async function init() {
+  const resp = await fetch('data.json?v=' + Date.now());
+  rawData = await resp.json();
+
+  document.getElementById('fetched-at').textContent = 'Last updated: ' + new Date(rawData.fetched_at).toLocaleString();
+
+  // Populate property dropdown
+  const propSel = document.getElementById('propertyFilter');
+  [...rawData.properties].sort((a,b) => a.name.localeCompare(b.name)).forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.id; o.textContent = p.name;
+    propSel.appendChild(o);
+  });
+
+  // Populate platform dropdown
+  const platforms = [...new Set(rawData.reservations.map(r => r.platform))].filter(Boolean).sort();
+  const platSel = document.getElementById('platformFilter');
+  platforms.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p; o.textContent = p.charAt(0).toUpperCase() + p.slice(1);
+    platSel.appendChild(o);
+  });
+
+  // Default to most recent year
+  const years = [...new Set(rawData.reservations.map(r => (r.departure_date || r.check_out || '').substring(0,4)))].filter(Boolean).sort();
+  if (years.length) document.getElementById('yearFilter').value = years[years.length-1];
+
+  renderAll();
+
+  document.getElementById('yearFilter').addEventListener('change', renderAll);
+  document.getElementById('propertyFilter').addEventListener('change', renderAll);
+  document.getElementById('platformFilter').addEventListener('change', renderAll);
+
+  // Tab switching
+  document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('page-' + tab.dataset.page).classList.add('active');
+    });
+  });
+}
+
+init();
+</script>
+</body>
+</html>
