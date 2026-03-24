@@ -444,10 +444,10 @@
             <option value="all">All Properties</option>
           </select>
           <select id="wkSort" onchange="window._wkSortCol=null;renderWeekly(rawData, document.getElementById('yearFilter').value)" style="background:#1e2035;color:#e2e8f0;border:1px solid #3d4168;border-radius:6px;padding:5px 10px;font-size:0.73rem;cursor:pointer">
+            <option value="perf_worst">⚠ Underperforming First</option>
+            <option value="perf_best">✓ On Target First</option>
             <option value="rev_desc">Revenue ↓</option>
             <option value="rev_asc">Revenue ↑</option>
-            <option value="gap_best">Gap: Best First</option>
-            <option value="gap_worst">Gap: Worst First</option>
             <option value="name_az">Name A → Z</option>
           </select>
         </div>
@@ -2294,14 +2294,19 @@ function renderWeekly(data, yearFilter) {
 
   // ── Sort & filter properties ───────────────────────────────────────────────
   function propYearRev(p)  { return Object.values(revByPropDate[p.id]||{}).reduce((s,v)=>s+v,0); }
-  function propGapScore(p) {
+
+  // Performance score = YTD actual ÷ YTD target (across all non-future months).
+  // Returns a ratio: >1 = above target, 0.7–1 = behind pace, <0.7 or 0 = underperforming.
+  // Properties with no target (closed/no target set) are pushed to the bottom.
+  function propPerfScore(p) {
     let act = 0, tgt = 0;
     activeMos.forEach(mo => {
       if (moType(mo) === 'future') return;
       act += cumRev(p.id, mo, monthEnd(mo));
       tgt += propTarget(p.id, mo);
     });
-    return tgt > 0 ? act / tgt : 0;
+    if (tgt <= 0) return null;   // closed / no target — sort to bottom
+    return act / tgt;
   }
 
   let sortedProps = [...props].filter(p => activeMos.some(mo => {
@@ -2310,7 +2315,18 @@ function renderWeekly(data, yearFilter) {
     return (t&&!t.closed&&t.revenue_target>0) || Object.keys(revByPropDate[p.id]||{}).some(d=>d.startsWith(moStr));
   }));
 
-  sortedProps.sort((a,b) => propYearRev(b) - propYearRev(a));  // base: rev desc
+  // Performance sort helper — nulls (no target) always go to the bottom
+  function perfSort(a, b, desc) {
+    const sa = propPerfScore(a), sb = propPerfScore(b);
+    if (sa === null && sb === null) return 0;
+    if (sa === null) return 1;   // a has no target → a goes lower
+    if (sb === null) return -1;
+    return desc ? sb - sa : sa - sb;
+  }
+
+  // Default base sort: underperforming first (most actionable view)
+  sortedProps.sort((a,b) => perfSort(a, b, false));
+
   // Column-click sort overrides the dropdown
   if (window._wkSortCol) {
     const col = window._wkSortCol;
@@ -2328,12 +2344,13 @@ function renderWeekly(data, yearFilter) {
       });
     }
   } else {
-    if (sortMode === 'rev_asc')   sortedProps.sort((a,b) => propYearRev(a) - propYearRev(b));
-    if (sortMode === 'gap_best')  sortedProps.sort((a,b) => propGapScore(b) - propGapScore(a));
-    if (sortMode === 'gap_worst') sortedProps.sort((a,b) => propGapScore(a) - propGapScore(b));
-    if (sortMode === 'name_az')   sortedProps.sort((a,b) => a.name.localeCompare(b.name));
+    if (sortMode === 'perf_worst') sortedProps.sort((a,b) => perfSort(a, b, false));
+    if (sortMode === 'perf_best')  sortedProps.sort((a,b) => perfSort(a, b, true));
+    if (sortMode === 'rev_desc')   sortedProps.sort((a,b) => propYearRev(b) - propYearRev(a));
+    if (sortMode === 'rev_asc')    sortedProps.sort((a,b) => propYearRev(a) - propYearRev(b));
+    if (sortMode === 'name_az')    sortedProps.sort((a,b) => a.name.localeCompare(b.name));
   }
-  if (propFilter !== 'all')     sortedProps = sortedProps.filter(p => p.id === propFilter);
+  if (propFilter !== 'all') sortedProps = sortedProps.filter(p => p.id === propFilter);
 
   // ── Colour helper ──────────────────────────────────────────────────────────
   function cellStyle(actual, target, isFuture, isClosed) {
@@ -2419,8 +2436,21 @@ function renderWeekly(data, yearFilter) {
   // ── Build a data row ───────────────────────────────────────────────────────
   function buildRow(pid, label, labelStyle, rowStyle) {
     const isPort = pid === '__port__';
+
+    // Performance badge for property rows
+    let perfBadge = '';
+    if (!isPort) {
+      const score = propPerfScore({ id: pid });
+      if (score !== null) {
+        const pct = Math.round(score * 100);
+        const badgeColor = pct >= 100 ? '#34d399' : pct >= 70 ? '#facc15' : '#f87171';
+        const tier = pct >= 100 ? '▲' : pct >= 70 ? '●' : '▼';
+        perfBadge = ` <span style="font-size:0.6rem;color:${badgeColor};font-weight:700;opacity:0.85">${tier}${pct}%</span>`;
+      }
+    }
+
     let row = `<tr style="${rowStyle}">
-      <td style="${SL};${labelStyle};${P};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">${label}</td>`;
+      <td style="${SL};${labelStyle};${P};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:210px">${label}${perfBadge}</td>`;
 
     activeMos.forEach(mo => {
       const type     = moType(mo);
