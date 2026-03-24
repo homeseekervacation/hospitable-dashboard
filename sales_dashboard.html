@@ -305,7 +305,7 @@
 <div class="header">
   <h1>HS <span>Sales Dashboard</span></h1>
   <div class="header-right">
-    <div class="hbadge">382 Leads · 5 Pipelines</div>
+    <div class="hbadge" id="k-header-badge">382 Leads · 5 Pipelines</div>
     <div class="updated" id="lastUpdated">Updated Mar 23, 2026</div>
     <button class="refresh-btn" id="refreshBtn" onclick="refreshAllData()">↻ Refresh</button>
     <button class="settings-btn" onclick="openSettings()">⚙ Settings <span class="sync-dot" id="syncDot"></span></button>
@@ -336,32 +336,32 @@
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Total Leads</div>
-      <div class="kpi-value">382</div>
+      <div class="kpi-value" id="k-total">382</div>
       <div class="kpi-sub">All time</div>
     </div>
     <div class="kpi-card c-amber">
       <div class="kpi-label">Open in Pipeline</div>
-      <div class="kpi-value">312</div>
+      <div class="kpi-value" id="k-open">312</div>
       <div class="kpi-sub">Active leads</div>
     </div>
     <div class="kpi-card c-green">
       <div class="kpi-label">Won Deals</div>
-      <div class="kpi-value">23</div>
-      <div class="kpi-sub">$1,239,100 closed</div>
+      <div class="kpi-value" id="k-won">23</div>
+      <div class="kpi-sub" id="k-won-sub">$1,239,100 closed</div>
     </div>
     <div class="kpi-card c-teal">
       <div class="kpi-label">Close Rate</div>
-      <div class="kpi-value">5.8%</div>
+      <div class="kpi-value" id="k-close-rate">5.8%</div>
       <div class="kpi-sub">Won / total leads</div>
     </div>
     <div class="kpi-card c-amber">
       <div class="kpi-label">Pipeline Value</div>
-      <div class="kpi-value">$5.2M</div>
+      <div class="kpi-value" id="k-pipeline-val">$5.2M</div>
       <div class="kpi-sub">Open opportunities</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Avg Close Time</div>
-      <div class="kpi-value">86d</div>
+      <div class="kpi-value" id="k-avg-close">86d</div>
       <div class="kpi-sub">Lead → Won</div>
     </div>
   </div>
@@ -2019,6 +2019,44 @@ const HOSP_BASE   = 'https://public.api.hospitable.com/v2';
 const GHL_LOC_ID  = 'OTJNyAUlz2jVzVLafkut';
 const GHL_WON_STAGE = 'cceebdc1-5a6d-45cd-a0c9-45ee9cab3404';
 
+// ── KPI render ──────────────────────────────────────────────────────────────
+function renderKPIs() {
+  const m = DATA.metrics;
+  const fmtVal = n => n >= 1e6 ? '$' + (n/1e6).toFixed(1) + 'M' : n >= 1e3 ? '$' + Math.round(n/1e3) + 'K' : '$' + n;
+  const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  set('k-week',         m.thisWeekLeads);
+  set('k-month',        m.thisMonthLeads);
+  set('k-total',        m.totalLeads);
+  set('k-open',         m.totalOpen);
+  set('k-won',          m.totalWon);
+  set('k-won-sub',      fmtVal(m.totalWonValue) + ' closed');
+  set('k-close-rate',   m.closeRate.toFixed(1) + '%');
+  set('k-pipeline-val', fmtVal(m.totalPipelineValue));
+  set('k-avg-close',    m.avgCloseDays + 'd');
+  set('k-header-badge', m.totalLeads + ' Leads · ' + DATA.pipelines.length + ' Pipelines');
+  // Update status card subtitle
+  const statusSub = document.querySelector('#cStatus')?.closest('.card')?.querySelector('.card-sub');
+  if (statusSub) statusSub.textContent = 'All ' + m.totalLeads + ' leads';
+}
+
+// ── Chart rebuild ────────────────────────────────────────────────────────────
+function rebuildCharts() {
+  ['cLeadFlow','cStatus','cMonthly','cPipeline','cStageVal','cConv'].forEach(id => {
+    const c = Chart.getChart(id); if (c) c.destroy();
+  });
+  chartLeadFlow = null;
+  initCharts();
+  if (tabInited.deals) {
+    ['cCloseTime','cDealCompare'].forEach(id => {
+      const c = Chart.getChart(id); if (c) c.destroy();
+    });
+    tabInited.deals = false;
+    if (document.getElementById('tab-deals')?.classList.contains('active')) {
+      setTimeout(() => initTabCharts('deals'), 20);
+    }
+  }
+}
+
 async function refreshAllData() {
   const btn = document.getElementById('refreshBtn');
   if (btn.disabled) return;
@@ -2030,7 +2068,7 @@ async function refreshAllData() {
   const results = {};
   try {
     if (ghlToken) {
-      try { results.ghl = await refreshGHLWonDeals(ghlToken); }
+      try { results.ghl = await refreshGHLFullData(ghlToken); }
       catch(e) { results.ghl = { error: e.message }; }
     }
     if (hospToken) {
@@ -2046,21 +2084,128 @@ async function refreshAllData() {
   showRefreshToast(results, ghlToken, hospToken);
 }
 
-async function refreshGHLWonDeals(token) {
-  const res = await fetch(
-    `${GHL_BASE}/opportunities/search?location_id=${GHL_LOC_ID}&status=won&limit=100`,
-    { headers: { 'Authorization': `Bearer ${token}`, 'Version': '2021-07-28' } }
-  );
-  if (!res.ok) throw new Error(`GHL ${res.status}`);
-  const data = await res.json();
-  const opps = (data.opportunities || []).filter(o => o.pipelineStageId === GHL_WON_STAGE);
+async function refreshGHLFullData(token) {
+  const headers = { 'Authorization': `Bearer ${token}`, 'Version': '2021-07-28' };
 
-  // Normalize name for fuzzy matching
+  // 1. Paginate ALL opportunities (all statuses)
+  let all = [], page = 1;
+  while (true) {
+    const r = await fetch(
+      `${GHL_BASE}/opportunities/search?location_id=${GHL_LOC_ID}&limit=100&page=${page}`,
+      { headers }
+    );
+    if (!r.ok) throw new Error(`GHL ${r.status}`);
+    const d = await r.json();
+    const opps = d.opportunities || [];
+    all.push(...opps);
+    const total = d.meta?.total ?? opps.length;
+    if (opps.length < 100 || all.length >= total) break;
+    page++;
+  }
+
+  // 2. Compute status counts
+  const wonOpps       = all.filter(o => o.pipelineStageId === GHL_WON_STAGE);
+  const openCount     = all.filter(o => o.status === 'open').length;
+  const lostCount     = all.filter(o => o.status === 'lost').length;
+  const abandonedCount= all.filter(o => o.status === 'abandoned').length;
+
+  // 3. This week / this month leads
+  const now = new Date();
+  const sow = new Date(now); sow.setHours(0,0,0,0); sow.setDate(now.getDate() - now.getDay());
+  const som = new Date(now.getFullYear(), now.getMonth(), 1);
+  const thisWeek  = all.filter(o => o.dateAdded && new Date(o.dateAdded) >= sow).length;
+  const thisMonth = all.filter(o => o.dateAdded && new Date(o.dateAdded) >= som).length;
+
+  // 4. avgCloseDays — recompute from existing wonDeals (manual data preserved)
+  const daysArr = DATA.wonDeals.filter(d => d.days > 0).map(d => d.days);
+  const avgDays = daysArr.length ? Math.round(daysArr.reduce((a,b) => a+b, 0) / daysArr.length) : DATA.metrics.avgCloseDays;
+
+  // 5. Update metrics
+  DATA.metrics.totalLeads        = all.length;
+  DATA.metrics.totalOpen         = openCount;
+  DATA.metrics.totalWon          = wonOpps.length;
+  DATA.metrics.totalLost         = lostCount;
+  DATA.metrics.totalAbandoned    = abandonedCount;
+  DATA.metrics.totalPipelineValue= Math.round(all.reduce((s,o) => s + (o.monetaryValue||0), 0));
+  DATA.metrics.totalWonValue     = Math.round(wonOpps.reduce((s,o) => s + (o.monetaryValue||0), 0));
+  DATA.metrics.closeRate         = all.length ? +((wonOpps.length / all.length) * 100).toFixed(1) : 0;
+  DATA.metrics.thisWeekLeads     = thisWeek;
+  DATA.metrics.thisMonthLeads    = thisMonth;
+  DATA.metrics.avgCloseDays      = avgDays;
+
+  // 6. Status distribution
+  DATA.statusDist = [
+    {status:'Open',      count:openCount,      color:'#3b82f6'},
+    {status:'Won',       count:wonOpps.length, color:'#22c55e'},
+    {status:'Abandoned', count:abandonedCount, color:'#f59e0b'},
+    {status:'Lost',      count:lostCount,      color:'#ef4444'}
+  ];
+
+  // 7. Pipeline breakdown
+  const PIPE_COLORS = ['#6c63ff','#3b82f6','#14b8a6','#f59e0b','#22c55e'];
+  const pipMap = {};
+  all.forEach(o => {
+    const pn = o.pipelineName || 'Unknown';
+    if (!pipMap[pn]) pipMap[pn] = { name:pn, count:0, stages:new Set() };
+    pipMap[pn].count++;
+    if (o.pipelineStageName) pipMap[pn].stages.add(o.pipelineStageName);
+  });
+  DATA.pipelines = Object.values(pipMap)
+    .sort((a,b) => b.count - a.count)
+    .map((p,i) => ({ name:p.name, count:p.count, stages:p.stages.size, color:PIPE_COLORS[i]||'#8892a4' }));
+
+  // 8. Stage values breakdown
+  const stageMap = {};
+  all.forEach(o => {
+    const sn = o.pipelineStageName || 'Unknown';
+    if (!stageMap[sn]) stageMap[sn] = { stage:sn, count:0, value:0 };
+    stageMap[sn].count++;
+    stageMap[sn].value += o.monetaryValue || 0;
+  });
+  DATA.stageValues = Object.values(stageMap)
+    .map(s => ({ ...s, value:Math.round(s.value) }))
+    .sort((a,b) => b.value - a.value);
+
+  // 9. Funnel — Cottage Leads open stage counts (preserve display order)
+  const FUNNEL_ORDER = ['Inquired','Engaged Leads','Owners Report Sent','Agreement Sent','Onboarding','Active Clients'];
+  const funnelMap = {};
+  all.filter(o => o.pipelineName === 'Cottage Leads' && o.status === 'open').forEach(o => {
+    const sn = o.pipelineStageName || 'Unknown';
+    if (!funnelMap[sn]) funnelMap[sn] = { name:sn, count:0, value:0 };
+    funnelMap[sn].count++;
+    funnelMap[sn].value += o.monetaryValue || 0;
+  });
+  const funnelOrdered = FUNNEL_ORDER.filter(s => funnelMap[s]).map(s => ({ name:s, count:funnelMap[s].count, value:Math.round(funnelMap[s].value) }));
+  // Include any extra stages not in the order list
+  Object.keys(funnelMap).filter(s => !FUNNEL_ORDER.includes(s)).forEach(s =>
+    funnelOrdered.push({ name:s, count:funnelMap[s].count, value:Math.round(funnelMap[s].value) })
+  );
+  if (funnelOrdered.length > 0) DATA.funnel = funnelOrdered;
+
+  // 10. Weekly / monthly lead flow from dateAdded
+  function isoWeek(dateStr) {
+    const d = new Date(dateStr);
+    const thu = new Date(d); thu.setDate(d.getDate() - ((d.getDay()+6)%7) + 3);
+    const jan4 = new Date(thu.getFullYear(), 0, 4);
+    const wk = 1 + Math.round((thu - jan4) / 604800000);
+    return thu.getFullYear() + '-W' + String(wk).padStart(2,'0');
+  }
+  const weekMap = {}, monthMap = {};
+  all.forEach(o => {
+    if (!o.dateAdded) return;
+    const ds = typeof o.dateAdded === 'string' ? o.dateAdded.slice(0,10) : new Date(o.dateAdded).toISOString().slice(0,10);
+    const w = isoWeek(ds); weekMap[w] = (weekMap[w]||0) + 1;
+    const m2 = ds.slice(0,7); monthMap[m2] = (monthMap[m2]||0) + 1;
+  });
+  DATA.weeklyLeads  = Object.keys(weekMap).sort().map(w => ({week:w, count:weekMap[w]}));
+  DATA.monthlyLeads = Object.keys(monthMap).sort().map(m2 => ({month:m2, count:monthMap[m2]}));
+  DATA.weekly2026   = DATA.weeklyLeads.filter(w => w.week.startsWith('2026-')).map(w => ({week:w.week.replace('2026-',''), count:w.count}));
+
+  // 11. Won deals — detect + prepend new ones (fuzzy name match, preserve manual fields)
   const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
   const existingKeys = new Set(DATA.wonDeals.map(d => norm(d.name)));
-
   let added = 0;
-  opps.forEach(o => {
+  wonOpps.forEach(o => {
     const oNorm = norm(o.name);
     const matched = [...existingKeys].some(k => {
       if (k === oNorm) return true;
@@ -2072,25 +2217,26 @@ async function refreshGHLWonDeals(token) {
         name: o.name.trim(), value: o.monetaryValue || 0,
         target: 0, actualYTD: 0, actual2025: 0, days: 0,
         closedAt: (o.lastStatusChangeAt || o.dateAdded || '').slice(0,10),
-        pipeline: 'Cottage Leads'
+        pipeline: o.pipelineName || 'Cottage Leads'
       });
       existingKeys.add(oNorm);
       added++;
     }
   });
+  // Sync won count to actual wonDeals array length
+  DATA.metrics.totalWon      = DATA.wonDeals.length;
+  DATA.metrics.totalWonValue = DATA.wonDeals.reduce((s,d) => s + (d.value||0), 0);
+  DATA.statusDist.find(s => s.status === 'Won').count = DATA.metrics.totalWon;
 
-  if (added > 0) {
-    DATA.metrics.totalWon      = DATA.wonDeals.length;
-    DATA.metrics.totalWonValue = DATA.wonDeals.reduce((s, d) => s + (d.value || 0), 0);
-    const wonDist = DATA.statusDist.find(s => s.status === 'Won');
-    if (wonDist) wonDist.count = DATA.metrics.totalWon;
-    renderWonTable();
-    if (document.getElementById('tab-deals')?.classList.contains('active')) {
-      tabInited.deals = false; initTabCharts('deals');
-    }
-    renderOverviewSalesFocus();
-  }
-  return { total: opps.length, added };
+  // 12. Re-render all components
+  renderKPIs();
+  renderFunnel();
+  renderPipCards();
+  renderWonTable();
+  rebuildCharts();
+  renderOverviewSalesFocus();
+
+  return { total: all.length, won: DATA.metrics.totalWon, open: openCount, added };
 }
 
 async function refreshHospitableYTD(token) {
@@ -2144,10 +2290,10 @@ function showRefreshToast(results, ghlToken, hospToken) {
   const rows = [];
   if (results.ghl) {
     rows.push(results.ghl.error
-      ? `<div class="refresh-toast-row"><span class="refresh-toast-src">GHL Won Deals</span><span class="refresh-toast-err">✗ ${results.ghl.error}</span></div>`
-      : `<div class="refresh-toast-row"><span class="refresh-toast-src">GHL Won Deals</span><span class="refresh-toast-ok">✓ ${results.ghl.total} deals${results.ghl.added > 0 ? ' · +' + results.ghl.added + ' new' : ' · up to date'}</span></div>`);
+      ? `<div class="refresh-toast-row"><span class="refresh-toast-src">GHL Full Refresh</span><span class="refresh-toast-err">✗ ${results.ghl.error}</span></div>`
+      : `<div class="refresh-toast-row"><span class="refresh-toast-src">GHL Full Refresh</span><span class="refresh-toast-ok">✓ ${results.ghl.total} total · ${results.ghl.won} won · ${results.ghl.open} open${results.ghl.added > 0 ? ' · +' + results.ghl.added + ' new' : ''}</span></div>`);
   } else if (ghlToken) {
-    rows.push(`<div class="refresh-toast-row"><span class="refresh-toast-src">GHL Won Deals</span><span class="refresh-toast-warn">— skipped</span></div>`);
+    rows.push(`<div class="refresh-toast-row"><span class="refresh-toast-src">GHL Full Refresh</span><span class="refresh-toast-warn">— skipped</span></div>`);
   }
   if (results.hospitable) {
     rows.push(results.hospitable.error
