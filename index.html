@@ -2457,7 +2457,7 @@ function renderWeekly(data, yearFilter) {
         h2 += `<th class="num" style="background:#141628;${border}${Ps};color:#facc15;font-size:0.63rem;white-space:nowrap">Target</th>`;
         wks.forEach(dt => {
           const d = parseInt(dt.slice(8, 10));
-          h2 += `<th class="num" style="background:#141628;${Ps};font-size:0.6rem;white-space:nowrap;color:#2d3148">${MO[mo-1]}&nbsp;${d}</th>`;
+          h2 += `<th class="num" style="background:#141628;${Ps};font-size:0.6rem;white-space:nowrap;color:#374151">${MO[mo-1]}&nbsp;${d}<br><span style="color:#2d3148;font-size:0.52rem">pace</span></th>`;
         });
         h2 += `<th class="num" style="background:#141628;${Ps};font-size:0.63rem;white-space:nowrap;color:#2d3148">Needed</th>`;
       } else {
@@ -2545,10 +2545,18 @@ function renderWeekly(data, yearFilter) {
         // Future month
         const wks = weekDates(mo);
         if (isExp) {
-          // Expanded: Target + future week cells (all —) + Needed
+          // Expanded: Target + weekly pace benchmarks + Needed
           row += `<td class="num" style="${bg}${border}${Ps};color:#facc15;font-weight:700;font-size:0.75rem;white-space:nowrap">${tgt>0?fmt(tgt):isClosed?'<span style="color:#374151;font-size:0.68rem">Closed</span>':'<span style="color:#374151">—</span>'}</td>`;
-          wks.forEach(() => {
-            row += `<td class="num" style="${bg}${Ps};white-space:nowrap;color:#2d3148;font-size:0.73rem">—</td>`;
+          const dim = new Date(parseInt(year), mo, 0).getDate();
+          wks.forEach(dt => {
+            const dayNum = parseInt(dt.slice(8, 10));
+            const pace   = tgt > 0 ? tgt * dayNum / dim : 0;
+            row += pace > 0
+              ? `<td class="num" style="${bg}${Ps};white-space:nowrap">
+                  <div style="font-size:0.73rem;font-weight:600;color:#374151">${fmtShort(pace)}</div>
+                  <div style="font-size:0.55rem;color:#2d3148;margin-top:1px">pace</div>
+                </td>`
+              : `<td class="num" style="${bg}${Ps};white-space:nowrap;color:#2d3148;font-size:0.73rem">—</td>`;
           });
           // Needed = full target (no revenue yet)
           const neededHtml = !isClosed && tgt > 0
