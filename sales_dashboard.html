@@ -159,6 +159,42 @@
   .na-sync-status { font-size: 10px; margin-top: 3px; min-height: 14px; }
   .sync-ok { color: var(--green); } .sync-err { color: var(--red); } .sync-ing { color: var(--muted); }
 
+  /* ── Call Log ───────────────────────────────────────────── */
+  .cl-session-bar { display:flex;align-items:center;gap:12px;margin-bottom:16px;padding:12px 18px;background:var(--card);border:1px solid var(--border);border-radius:10px;flex-wrap:wrap; }
+  .cl-live-dot { width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;animation:cl-pulse 1.4s infinite; }
+  @keyframes cl-pulse { 0%,100%{opacity:1}50%{opacity:.3} }
+  .cl-start-btn { background:var(--accent);border:none;border-radius:6px;color:#fff;font-size:12px;font-weight:700;padding:7px 16px;cursor:pointer;white-space:nowrap; }
+  .cl-start-btn:hover { background:#5a52d5; }
+  .cl-end-btn { background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:12px;padding:6px 14px;cursor:pointer;white-space:nowrap; }
+  .cl-end-btn:hover { border-color:var(--red);color:var(--red); }
+  .cl-attendees-inp { background:var(--bg);border:1px solid var(--border);border-radius:5px;color:var(--text);font-size:11px;padding:5px 9px;min-width:180px; }
+  .cl-attendees-inp:focus { outline:none;border-color:var(--accent); }
+  .cl-log-grid { display:grid;grid-template-columns:240px 1fr;gap:14px;margin-bottom:14px; }
+  .cl-log-grid select { width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:7px 10px;margin-bottom:6px;cursor:pointer; }
+  .cl-log-grid select:focus { outline:none;border-color:var(--accent); }
+  .cl-note-area { width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:8px 10px;resize:vertical;height:80px;font-family:inherit; }
+  .cl-note-area:focus { outline:none;border-color:var(--accent); }
+  .cl-log-actions { display:flex;gap:8px;margin-top:6px;align-items:center; }
+  .cl-author-inp { flex:1;background:var(--bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px;padding:5px 8px; }
+  .cl-author-inp:focus { outline:none;border-color:var(--accent); }
+  .cl-log-btn { background:var(--accent);border:none;border-radius:5px;color:#fff;font-size:11px;font-weight:700;padding:6px 14px;cursor:pointer;white-space:nowrap;flex-shrink:0; }
+  .cl-log-btn:hover { background:#5a52d5; }
+  .cl-log-btn:disabled { opacity:.5;cursor:default; }
+  .cl-log-status { font-size:10px;min-height:14px;margin-top:4px; }
+  .cl-entries-wrap { border-top:1px solid var(--border);padding-top:14px;margin-top:4px; }
+  .cl-entries-hdr { font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px; }
+  .cl-entry { display:flex;gap:10px;padding:10px 12px;background:rgba(108,99,255,.05);border:1px solid rgba(108,99,255,.15);border-left:3px solid var(--accent);border-radius:6px;margin-bottom:7px; }
+  .cl-entry-body { flex:1;min-width:0; }
+  .cl-entry-prospect { font-size:12px;font-weight:700;color:var(--accent);margin-bottom:2px; }
+  .cl-entry-note { font-size:12px;color:var(--text);line-height:1.45; }
+  .cl-entry-sync { font-size:9px;margin-top:4px; }
+  .cl-entry-meta { font-size:10px;color:var(--muted);text-align:right;white-space:nowrap;padding-top:2px; }
+  .cl-empty { text-align:center;padding:24px;color:var(--muted);font-size:12px; }
+  .cl-past-session { background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:14px; }
+  .cl-past-hdr { display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border); }
+  .cl-past-date { font-size:13px;font-weight:700; }
+  .cl-past-attendees { font-size:11px;color:var(--muted); }
+
   /* Settings modal */
   .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 999; align-items: center; justify-content: center; }
   .modal-bg.open { display: flex; }
@@ -377,6 +413,14 @@
 
   <div class="row row-1">
     <div class="card">
+      <div class="card-title">🎯 Next Actions — Priority Board</div>
+      <div class="card-sub">CRM-enriched · Sorted by urgency &amp; deal value · Updated Mar 24, 2026</div>
+      <div id="nextActionsEl"></div>
+    </div>
+  </div>
+
+  <div class="row row-1">
+    <div class="card">
       <div class="card-title">🔍 Leads Worth Following Up</div>
       <div class="card-sub">Ranked by engagement score, lead score &amp; CRM stage — updated from all tabs</div>
       <div class="fl-table-wrap" id="followUpLeadsEl"><div style="color:var(--muted);font-size:12px;padding:8px 0">Loading…</div></div>
@@ -471,24 +515,48 @@
 
 <!-- ── CALL UPDATE ── -->
 <div class="section" id="tab-callupdate">
-  <div class="doc-hdr">
-    <h2>2026 HS Sales Team Call Update</h2>
-    <a href="https://docs.google.com/document/d/1oTxAOECYQszMnN9iUDiXjFK-yKVKUismZ045vajdPwo/edit" target="_blank" class="doc-link">Open in Google Docs →</a>
+
+  <!-- Session Control Bar -->
+  <div class="cl-session-bar" id="clSessionBar">
+    <span style="flex:1;color:var(--muted);font-size:12px">Loading…</span>
   </div>
 
-  <!-- Next Actions Board -->
-  <div class="card" style="margin-bottom:16px">
-    <div class="card-title">🎯 Next Actions — Priority Board</div>
-    <div class="card-sub">CRM-enriched · Sorted by urgency &amp; deal value · Updated Mar 23, 2026</div>
-    <div id="nextActionsEl"></div>
+  <!-- Active Log Panel — shown when a session is running -->
+  <div class="card" id="clActivePanel" style="display:none;margin-bottom:16px">
+    <div class="card-title">📝 Log Entry</div>
+    <div class="card-sub">Select a prospect, add your note, and it syncs to GHL as a contact note</div>
+    <div class="cl-log-grid">
+      <div>
+        <select id="clProspectSelect">
+          <option value="">— General meeting note —</option>
+        </select>
+        <div style="font-size:10px;color:var(--muted);line-height:1.4">Leave blank for a general note not tied to a specific lead</div>
+      </div>
+      <div>
+        <textarea class="cl-note-area" id="clNoteText" placeholder="What was discussed? Any action items or decisions?"></textarea>
+        <div class="cl-log-actions">
+          <input class="cl-author-inp" id="clAuthorField" placeholder="Your name (e.g. Edwin)">
+          <button class="cl-log-btn" id="clLogBtn" onclick="logCallEntry()">Log + Sync to GHL ▶</button>
+        </div>
+        <div class="cl-log-status" id="clLogStatus"></div>
+      </div>
+    </div>
+    <div class="cl-entries-wrap">
+      <div class="cl-entries-hdr" id="clEntriesHdr">Today's Log</div>
+      <div id="clEntriesEl"><div class="cl-empty">No entries yet — start logging above</div></div>
+    </div>
   </div>
 
-  <!-- Weekly Call Log -->
+  <!-- Past sessions from localStorage -->
+  <div id="clPastSessionsEl"></div>
+
+  <!-- Historical call notes (from code data) -->
   <div class="card">
-    <div class="card-title">📋 Weekly Call Log</div>
-    <div class="card-sub">Sourced from Google Doc · Enriched with CRM stage &amp; value</div>
+    <div class="card-title">📋 Past Call Notes</div>
+    <div class="card-sub">Historical weekly notes · Enriched with CRM stage &amp; value</div>
     <div id="docEl"></div>
   </div>
+
 </div>
 
 </div><!-- /container -->
@@ -920,8 +988,13 @@ function initTabCharts(id) {
   }
 
   if (id === 'pipeline') {
+    renderNextActions();
     renderFollowUpLeads();
     renderOutreachList();
+  }
+
+  if (id === 'callupdate') {
+    renderCallLog();
   }
 }
 
@@ -1025,6 +1098,190 @@ function renderCallUpdate() {
         </li>`;
       }).join('')}</ul>
     </div>`).join('');
+}
+
+// ═══════════════════ CALL LOG SESSION ═══════════════════
+const CL_KEY = 'hs_call_sessions';
+function getCLSessions() { try { return JSON.parse(localStorage.getItem(CL_KEY) || '[]'); } catch(e) { return []; } }
+function saveCLSessions(s) { localStorage.setItem(CL_KEY, JSON.stringify(s)); }
+function getActiveCLSession() {
+  const today = new Date().toISOString().slice(0,10);
+  return getCLSessions().find(s => s.id === today) || null;
+}
+
+function renderCallLog() {
+  renderCLSessionBar();
+  renderCLPastSessions();
+  renderCallUpdate();
+}
+
+function renderCLSessionBar() {
+  const session = getActiveCLSession();
+  const today = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  const bar = document.getElementById('clSessionBar');
+  if (!bar) return;
+  if (session) {
+    bar.innerHTML = `
+      <span class="cl-live-dot"></span>
+      <span style="font-size:13px;font-weight:700;color:var(--green)">Call in Progress</span>
+      <span style="font-size:12px;color:var(--muted)">${today}</span>
+      <span style="font-size:11px;color:var(--muted)">·</span>
+      <span style="font-size:11px;color:var(--muted)">Attendees:</span>
+      <input class="cl-attendees-inp" id="clAttendees" value="${session.attendees || ''}" placeholder="e.g. Edwin, Marisa" oninput="updateCLAttendees(this.value)">
+      <button class="cl-end-btn" onclick="endCLSession()">End Call</button>
+    `;
+    const panel = document.getElementById('clActivePanel');
+    if (panel) {
+      panel.style.display = 'block';
+      populateCLProspectSelect();
+      const auth = document.getElementById('clAuthorField');
+      if (auth && !auth.value) auth.value = localStorage.getItem('hs_default_author') || '';
+    }
+    renderCLEntries(session);
+  } else {
+    bar.innerHTML = `
+      <span style="font-size:12px;color:var(--muted);flex:1">${today}</span>
+      <span style="font-size:11px;color:var(--muted)">No active call session</span>
+      <button class="cl-start-btn" onclick="startCLSession()">▶ Start This Week's Call</button>
+    `;
+    const panel = document.getElementById('clActivePanel');
+    if (panel) panel.style.display = 'none';
+  }
+}
+
+function startCLSession() {
+  const today = new Date().toISOString().slice(0,10);
+  const sessions = getCLSessions();
+  if (!sessions.find(s => s.id === today)) {
+    const dateLabel = new Date().toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+    sessions.unshift({ id: today, dateLabel, attendees: localStorage.getItem('hs_default_author') || '', entries: [] });
+    saveCLSessions(sessions);
+  }
+  renderCLSessionBar();
+  renderCLPastSessions();
+}
+
+function endCLSession() {
+  renderCLSessionBar();
+  renderCLPastSessions();
+}
+
+function updateCLAttendees(val) {
+  const sessions = getCLSessions();
+  const today = new Date().toISOString().slice(0,10);
+  const s = sessions.find(s => s.id === today);
+  if (s) { s.attendees = val; saveCLSessions(sessions); }
+}
+
+function populateCLProspectSelect() {
+  const sel = document.getElementById('clProspectSelect');
+  if (!sel) return;
+  sel.innerHTML = '<option value="">— General meeting note —</option>' +
+    Object.entries(CRM_PROSPECTS.byName)
+      .map(([k, v]) => `<option value="${k}">${v.fullName}${v.property ? ' · ' + v.property.slice(0,38) : ''}</option>`)
+      .join('');
+}
+
+async function logCallEntry() {
+  const btn = document.getElementById('clLogBtn');
+  const statusEl = document.getElementById('clLogStatus');
+  const prospectKey = document.getElementById('clProspectSelect')?.value || '';
+  const note = (document.getElementById('clNoteText')?.value || '').trim();
+  const author = (document.getElementById('clAuthorField')?.value || '').trim() || localStorage.getItem('hs_default_author') || 'Team';
+  if (!note) { statusEl.innerHTML = '<span style="color:var(--amber)">Please enter a note first</span>'; return; }
+  const prospect = prospectKey ? CRM_PROSPECTS.byName[prospectKey] : null;
+  const ts = new Date().toISOString();
+  const entry = { ts, author, prospectKey: prospectKey || null, prospectName: prospect?.fullName || 'General Note', contactId: prospect?.contactId || null, note, synced: false };
+  const sessions = getCLSessions();
+  const today = new Date().toISOString().slice(0,10);
+  const session = sessions.find(s => s.id === today);
+  if (!session) return;
+  session.entries.unshift(entry);
+  saveCLSessions(sessions);
+  const noteEl = document.getElementById('clNoteText');
+  if (noteEl) noteEl.value = '';
+  renderCLEntries(session);
+  const token = localStorage.getItem('hs_ghl_token');
+  if (token && entry.contactId) {
+    if (btn) btn.disabled = true;
+    statusEl.innerHTML = '<span style="color:var(--muted)">⏳ Syncing to GHL…</span>';
+    try {
+      const dateStr = new Date().toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+      const res = await fetch(`https://services.leadconnectorhq.com/contacts/${entry.contactId}/notes`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Version': '2021-07-28', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: `[Call Log · ${author} · ${dateStr}]\n\n${note}` })
+      });
+      const sessions2 = getCLSessions(); const s2 = sessions2.find(s => s.id === today);
+      const e2 = s2?.entries.find(e => e.ts === ts);
+      if (res.ok) {
+        if (e2) { e2.synced = true; saveCLSessions(sessions2); }
+        renderCLEntries(s2 || session);
+        statusEl.innerHTML = '<span style="color:var(--green)">✓ Logged and synced to GHL</span>';
+      } else {
+        statusEl.innerHTML = `<span style="color:var(--amber)">✓ Logged · GHL sync failed (${res.status})</span>`;
+      }
+    } catch(err) {
+      statusEl.innerHTML = '<span style="color:var(--amber)">✓ Logged · Could not reach GHL</span>';
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  } else if (!token) {
+    statusEl.innerHTML = '<span style="color:var(--muted)">✓ Logged locally · Set GHL token in ⚙ to sync</span>';
+    setTimeout(() => { if (statusEl) statusEl.innerHTML = ''; }, 4000);
+  } else {
+    statusEl.innerHTML = '<span style="color:var(--muted)">✓ Logged · No GHL contact linked to this prospect</span>';
+    setTimeout(() => { if (statusEl) statusEl.innerHTML = ''; }, 4000);
+  }
+}
+
+function renderCLEntries(session) {
+  const el = document.getElementById('clEntriesEl');
+  const hdr = document.getElementById('clEntriesHdr');
+  if (!el) return;
+  const n = session.entries.length;
+  if (hdr) hdr.textContent = `Today's Log (${n} ${n === 1 ? 'entry' : 'entries'})`;
+  if (!n) { el.innerHTML = '<div class="cl-empty">No entries yet — start logging above</div>'; return; }
+  el.innerHTML = session.entries.map(e => {
+    const t = new Date(e.ts).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+    const isGeneral = !e.prospectKey;
+    return `<div class="cl-entry">
+      <div class="cl-entry-body">
+        <div class="cl-entry-prospect" style="${isGeneral ? 'color:var(--muted)' : ''}">${isGeneral ? '📋 General Note' : e.prospectName}</div>
+        <div class="cl-entry-note">${e.note}</div>
+        <div class="cl-entry-sync">${e.synced ? '<span style="color:var(--green)">✓ Synced to GHL</span>' : '<span style="color:var(--muted)">Saved locally</span>'}</div>
+      </div>
+      <div class="cl-entry-meta">${t}<br><span style="color:var(--accent)">${e.author}</span></div>
+    </div>`;
+  }).join('');
+}
+
+function renderCLPastSessions() {
+  const el = document.getElementById('clPastSessionsEl');
+  if (!el) return;
+  const today = new Date().toISOString().slice(0,10);
+  const past = getCLSessions().filter(s => s.id !== today);
+  if (!past.length) { el.innerHTML = ''; return; }
+  el.innerHTML = past.map(s => {
+    const entries = s.entries.map(e => {
+      const t = new Date(e.ts).toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+      return `<div class="cl-entry">
+        <div class="cl-entry-body">
+          <div class="cl-entry-prospect" style="${!e.prospectKey ? 'color:var(--muted)' : ''}">${!e.prospectKey ? '📋 General Note' : e.prospectName}</div>
+          <div class="cl-entry-note">${e.note}</div>
+          <div class="cl-entry-sync">${e.synced ? '<span style="color:var(--green)">✓ Synced to GHL</span>' : '<span style="color:var(--muted)">Saved locally</span>'}</div>
+        </div>
+        <div class="cl-entry-meta">${t}<br><span style="color:var(--accent)">${e.author}</span></div>
+      </div>`;
+    }).join('') || '<div class="cl-empty">No entries logged this session</div>';
+    return `<div class="cl-past-session">
+      <div class="cl-past-hdr">
+        <span class="cl-past-date">${s.dateLabel}</span>
+        ${s.attendees ? `<span class="cl-past-attendees">👥 ${s.attendees}</span>` : ''}
+      </div>
+      ${entries}
+    </div>`;
+  }).join('');
 }
 
 // ═══════════════════ CRM PROSPECTS (live GHL data) ═══════════════════
@@ -1724,8 +1981,6 @@ document.addEventListener('DOMContentLoaded', () => {
   renderFunnel();
   renderPipCards();
   renderWonTable();
-  renderNextActions();
-  renderCallUpdate();
   initCharts();
   updateSyncDot();
   renderOverviewSalesFocus();
