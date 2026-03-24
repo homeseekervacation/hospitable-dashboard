@@ -2281,16 +2281,15 @@ function renderWeekly(data, yearFilter) {
     });
   });
 
-  // ── Default expand state (current + next 2 future, reset when year changes) ─
+  // ── Default expand state (current + next 3 future = 30/60/90 days out) ─────
   if (window._wkInitYear !== year) {
     window._wkInitYear = year;
     window._wkExpanded = {};
-    const curMo = parseInt(todayStr.substring(5, 7));
     let futCount = 0;
     activeMos.forEach(mo => {
       const t = moType(mo);
       if (t === 'current') { window._wkExpanded[mo] = true; }
-      else if (t === 'future' && futCount < 2) { window._wkExpanded[mo] = true; futCount++; }
+      else if (t === 'future' && futCount < 3) { window._wkExpanded[mo] = true; futCount++; }
     });
   }
 
@@ -2397,6 +2396,7 @@ function renderWeekly(data, yearFilter) {
   let h2 = `<tr style="background:#141628">
     <th style="${SL};background:#141628;text-align:left;${P};font-size:0.68rem;color:#6b7280">PROPERTY</th>`;
 
+  let futExpandedCount = 0; // tracks +30/+60/+90 labelling
   activeMos.forEach(mo => {
     const type   = moType(mo);
     const isCurr = type === 'current';
@@ -2451,15 +2451,19 @@ function renderWeekly(data, yearFilter) {
       }
 
     } else {
-      // Future — Collapsed: 1 col (target) | Expanded: Target + weeks + Needed
+      // Future — Collapsed: 1 col (target) | Expanded: Target + weeks (booked vs pace) + Needed
       if (isExp) {
-        h1 += `<th colspan="${2 + wks.length}" onclick="${toggleFn(mo)}" style="background:#0f1117;${border}${Ps};${thBase}color:#4b5563;font-size:0.72rem;">${icon} ${label}</th>`;
+        futExpandedCount++;
+        const horizonLabel = futExpandedCount === 1 ? '+30d' : futExpandedCount === 2 ? '+60d' : futExpandedCount === 3 ? '+90d' : '';
+        const horizonBadge = horizonLabel ? ` <span style="font-size:0.58rem;color:#6366f1;font-weight:700">${horizonLabel}</span>` : '';
+        const futHeaderColor = futExpandedCount <= 3 ? '#6b7280' : '#4b5563';
+        h1 += `<th colspan="${2 + wks.length}" onclick="${toggleFn(mo)}" style="background:#0f1117;${border}${Ps};${thBase}color:${futHeaderColor};font-size:0.72rem;">${icon} ${label}${horizonBadge}</th>`;
         h2 += `<th class="num" style="background:#141628;${border}${Ps};color:#facc15;font-size:0.63rem;white-space:nowrap">Target</th>`;
         wks.forEach(dt => {
           const d = parseInt(dt.slice(8, 10));
-          h2 += `<th class="num" style="background:#141628;${Ps};font-size:0.6rem;white-space:nowrap;color:#374151">${MO[mo-1]}&nbsp;${d}<br><span style="color:#2d3148;font-size:0.52rem">pace</span></th>`;
+          h2 += `<th class="num" style="background:#141628;${Ps};font-size:0.6rem;white-space:nowrap;color:#374151">${MO[mo-1]}&nbsp;${d}<br><span style="color:#2d3148;font-size:0.52rem">booked</span></th>`;
         });
-        h2 += `<th class="num" style="background:#141628;${Ps};font-size:0.63rem;white-space:nowrap;color:#2d3148">Needed</th>`;
+        h2 += `<th class="num" style="background:#141628;${Ps};font-size:0.63rem;white-space:nowrap;color:#4b5563">Needed</th>`;
       } else {
         h1 += `<th colspan="1" onclick="${toggleFn(mo)}" style="background:#0f1117;${border}${Ps};${thBase}color:#4b5563;font-size:0.72rem;">${icon} ${label}</th>`;
         h2 += `<th class="num" style="background:#141628;${border}${Ps};font-size:0.63rem;white-space:nowrap;color:#2d3148">Target</th>`;
@@ -2545,22 +2549,35 @@ function renderWeekly(data, yearFilter) {
         // Future month
         const wks = weekDates(mo);
         if (isExp) {
-          // Expanded: Target + weekly pace benchmarks + Needed
+          // Expanded: Target + colour-coded booked vs pace + Needed
           row += `<td class="num" style="${bg}${border}${Ps};color:#facc15;font-weight:700;font-size:0.75rem;white-space:nowrap">${tgt>0?fmt(tgt):isClosed?'<span style="color:#374151;font-size:0.68rem">Closed</span>':'<span style="color:#374151">—</span>'}</td>`;
           const dim = new Date(parseInt(year), mo, 0).getDate();
           wks.forEach(dt => {
             const dayNum = parseInt(dt.slice(8, 10));
             const pace   = tgt > 0 ? tgt * dayNum / dim : 0;
-            row += pace > 0
-              ? `<td class="num" style="${bg}${Ps};white-space:nowrap">
-                  <div style="font-size:0.73rem;font-weight:600;color:#374151">${fmtShort(pace)}</div>
-                  <div style="font-size:0.55rem;color:#2d3148;margin-top:1px">pace</div>
-                </td>`
-              : `<td class="num" style="${bg}${Ps};white-space:nowrap;color:#2d3148;font-size:0.73rem">—</td>`;
+            const booked = isPort ? portCum(mo, dt) : cumRev(pid, mo, dt);
+            if (!tgt || isClosed) {
+              row += `<td class="num" style="${bg}${Ps};white-space:nowrap;color:#2d3148;font-size:0.73rem">—</td>`;
+            } else {
+              const ratio  = pace > 0 ? booked / pace : 0;
+              const color  = ratio >= 1   ? '#34d399'
+                           : ratio >= 0.7 ? '#facc15'
+                           : booked > 0   ? '#f87171'
+                                          : '#4b5563';
+              const cellBg = ratio >= 1 ? 'background:#1a3028;' : booked === 0 ? '' : '';
+              const pctLbl = pace > 0 && booked > 0
+                ? `<div style="font-size:0.54rem;color:${color};opacity:0.8;margin-top:1px">${Math.round(ratio*100)}%</div>`
+                : `<div style="font-size:0.54rem;color:#2d3148;margin-top:1px">${fmtShort(pace)} pace</div>`;
+              row += `<td class="num" style="${bg}${cellBg}${Ps};white-space:nowrap">
+                <div style="font-size:0.73rem;font-weight:600;color:${color}">${booked>0?fmtShort(booked):'—'}</div>${pctLbl}
+              </td>`;
+            }
           });
-          // Needed = full target (no revenue yet)
+          // Needed = target minus already booked
+          const alreadyBooked = isPort ? portCum(mo, monthEnd(mo)) : cumRev(pid, mo, monthEnd(mo));
+          const stillNeeded   = Math.max(0, (tgt || 0) - alreadyBooked);
           const neededHtml = !isClosed && tgt > 0
-            ? `<span style="color:#4b5563;font-size:0.73rem">${fmt(tgt)}</span>`
+            ? `<div style="color:#4b5563;font-size:0.73rem;font-weight:600">${fmt(stillNeeded)}</div>${alreadyBooked>0?`<div style="font-size:0.54rem;color:#34d399;margin-top:1px">${fmtShort(alreadyBooked)} booked</div>`:''}`
             : `<span style="color:#374151">—</span>`;
           row += `<td class="num" style="${bg}${Ps};white-space:nowrap">${neededHtml}</td>`;
         } else {
