@@ -2101,14 +2101,15 @@ function tgtFilterClick(btn) {
 
 // ── Weekly Tracker ────────────────────────────────────────────────────────────
 function renderWeekly(data, yearFilter) {
-  const year = yearFilter === 'all' ? String(new Date().getFullYear()) : yearFilter;
-  const targets  = data.revenue_targets  || {};
-  const fees     = data.management_fees  || {};
+  const year     = yearFilter === 'all' ? String(new Date().getFullYear()) : yearFilter;
+  const targets  = data.revenue_targets || {};
   const props    = data.properties;
   const todayStr = new Date().toISOString().slice(0, 10);
-  const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const MO       = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const P        = 'padding:8px 12px';
+  const SL       = 'position:sticky;left:0;z-index:1';
 
-  // Build revenue lookup: propId → dateStr → revenue
+  // Revenue lookup: propId → dateStr → amount (by checkout date, from Hospitable)
   const revByPropDate = {};
   data.reservations.forEach(r => {
     if (!r.financials?.host?.revenue?.amount) return;
@@ -2121,7 +2122,7 @@ function renderWeekly(data, yearFilter) {
     revByPropDate[pid][dep] = (revByPropDate[pid][dep] || 0) + rev;
   });
 
-  // Cumulative revenue for a property in a month up to a date (inclusive)
+  // Cumulative revenue for a property in a month up to a given date
   function cumRev(pid, mo, upTo) {
     const moStr = `${year}-${String(mo).padStart(2,'0')}`;
     return Object.entries(revByPropDate[pid] || {})
@@ -2129,194 +2130,173 @@ function renderWeekly(data, yearFilter) {
       .reduce((s, [, v]) => s + v, 0);
   }
 
-  // Portfolio cumulative for a month up to a date
-  function portCumRev(mo, upTo) {
+  // Portfolio cumulative across all properties
+  function portCum(mo, upTo) {
     return props.reduce((s, p) => s + cumRev(p.id, mo, upTo), 0);
   }
 
-  // Portfolio monthly target
+  // Monthly target helpers
+  function propTarget(pid, mo) {
+    const t = (targets[pid] || {})[mo];
+    return (t && !t.closed && t.revenue_target) ? t.revenue_target : 0;
+  }
   function portTarget(mo) {
-    return props.reduce((s, p) => {
-      const t = (targets[p.id] || {})[mo];
-      return s + (t && !t.closed && t.revenue_target ? t.revenue_target : 0);
-    }, 0);
+    return props.reduce((s, p) => s + propTarget(p.id, mo), 0);
   }
 
-  // Week reference dates within a month: day 7, 14, 21, 28, (last day if > 28)
-  function getWeekDates(mo) {
+  // Week-end reference dates within a month (7th, 14th, 21st, 28th, last day)
+  function weekDates(mo) {
     const dim = new Date(parseInt(year), mo, 0).getDate();
-    const dates = [];
-    [7, 14, 21, 28].forEach(d => {
-      if (d <= dim) dates.push(`${year}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`);
-    });
-    if (dim > 28) dates.push(`${year}-${String(mo).padStart(2,'0')}-${String(dim).padStart(2,'0')}`);
-    return dates;
+    const out = [];
+    [7,14,21,28].forEach(d => { if (d <= dim) out.push(`${year}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`); });
+    if (dim > 28) out.push(`${year}-${String(mo).padStart(2,'0')}-${String(dim).padStart(2,'0')}`);
+    return out;
   }
 
-  // Active months: has target or has revenue
+  // Only show months that have a target or actual revenue
   const activeMos = Array.from({length:12},(_,i)=>i+1).filter(mo => {
     const moStr = `${year}-${String(mo).padStart(2,'0')}`;
-    const hasTgt = props.some(p => { const t=(targets[p.id]||{})[mo]; return t&&!t.closed&&t.revenue_target>0; });
-    const hasRev = props.some(p => Object.keys(revByPropDate[p.id]||{}).some(d=>d.startsWith(moStr)));
-    return hasTgt || hasRev;
+    return props.some(p => {
+      const t = (targets[p.id]||{})[mo];
+      return (t&&!t.closed&&t.revenue_target>0) ||
+             Object.keys(revByPropDate[p.id]||{}).some(d=>d.startsWith(moStr));
+    });
   });
 
-  // Sort props by year revenue descending
-  const sortedProps = [...props].sort((a,b) => {
-    const ra = Object.values(revByPropDate[a.id]||{}).reduce((s,v)=>s+v,0);
-    const rb = Object.values(revByPropDate[b.id]||{}).reduce((s,v)=>s+v,0);
-    return rb - ra;
-  });
+  // Month-end date string
+  function monthEnd(mo) {
+    const dim = new Date(parseInt(year), mo, 0).getDate();
+    return `${year}-${String(mo).padStart(2,'0')}-${String(dim).padStart(2,'0')}`;
+  }
 
-  const cellPad = 'padding:7px 10px';
-  const stickyLeft = 'position:sticky;left:0;z-index:1';
+  // Sort props by year revenue desc
+  const sortedProps = [...props].sort((a,b) =>
+    Object.values(revByPropDate[b.id]||{}).reduce((s,v)=>s+v,0) -
+    Object.values(revByPropDate[a.id]||{}).reduce((s,v)=>s+v,0)
+  ).filter(p => activeMos.some(mo => {
+    const moStr = `${year}-${String(mo).padStart(2,'0')}`;
+    const t = (targets[p.id]||{})[mo];
+    return (t&&!t.closed&&t.revenue_target>0) || Object.keys(revByPropDate[p.id]||{}).some(d=>d.startsWith(moStr));
+  }));
 
-  // ── Header row 1: month group labels ────────────────────────────────────────
+  // ── Colour helper ──────────────────────────────────────────────────────────
+  function cellStyle(actual, target, isFuture, isClosed) {
+    if (isClosed)             return { bg:'', color:'#374151' };
+    if (isFuture && !actual)  return { bg:'', color:'#2d3148' };
+    if (!actual && target>0)  return { bg:'background:#3b1a1a;', color:'#f87171' };
+    if (!actual)              return { bg:'', color:'#374151' };
+    if (target<=0)            return { bg:'', color:'#9ca3af' };
+    const pct = actual/target*100;
+    if (pct>=100) return { bg:'background:#1e3a2f;', color:'#34d399' };
+    if (pct>=70)  return { bg:'', color:'#facc15' };
+    return { bg:'', color:'#f87171' };
+  }
+
+  // ── Header ─────────────────────────────────────────────────────────────────
+  // Row 1: Month group labels
   let h1 = `<tr style="background:#0f1117">
-    <th style="${stickyLeft};background:#0f1117;min-width:175px;text-align:left;${cellPad}"></th>
-    <th style="background:#0f1117;${cellPad};white-space:nowrap;font-size:0.68rem;color:#6b7280">Mgmt%</th>
-    <th style="background:#0f1117;${cellPad};white-space:nowrap;font-size:0.68rem;color:#6b7280">Fee Tgt</th>`;
+    <th style="${SL};background:#0f1117;min-width:175px;text-align:left;${P}"></th>`;
   activeMos.forEach(mo => {
-    const wkDates = getWeekDates(mo);
-    h1 += `<th colspan="${1 + wkDates.length}" style="background:#0f1117;text-align:center;border-left:3px solid #3d4168;${cellPad};color:#a78bfa;font-size:0.8rem;font-weight:700">${MO[mo-1]} ${year}</th>`;
+    const wks = weekDates(mo);
+    const isCurrentMo = todayStr.startsWith(`${year}-${String(mo).padStart(2,'0')}`);
+    const border = isCurrentMo ? 'border-left:3px solid #6366f1;' : 'border-left:3px solid #3d4168;';
+    // cols: Target + weeks + Gap
+    h1 += `<th colspan="${1+wks.length+1}" style="background:#0f1117;text-align:center;${border}${P};color:${isCurrentMo?'#6366f1':'#a78bfa'};font-size:0.8rem;font-weight:700">${MO[mo-1]} ${year}${isCurrentMo?' ●':''}</th>`;
   });
   h1 += '</tr>';
 
-  // ── Header row 2: target + week date labels ──────────────────────────────────
+  // Row 2: Sub-column labels
   let h2 = `<tr style="background:#141628">
-    <th style="${stickyLeft};background:#141628;text-align:left;${cellPad};font-size:0.7rem;color:#6b7280">Property</th>
-    <th style="background:#141628;${cellPad};font-size:0.68rem;color:#6b7280;text-align:right"></th>
-    <th style="background:#141628;${cellPad};font-size:0.68rem;color:#6b7280;text-align:right"></th>`;
+    <th style="${SL};background:#141628;text-align:left;${P};font-size:0.7rem;color:#6b7280">Property</th>`;
   activeMos.forEach(mo => {
-    const wkDates = getWeekDates(mo);
-    h2 += `<th class="num" style="background:#141628;border-left:3px solid #3d4168;${cellPad};color:#facc15;font-size:0.68rem;white-space:nowrap">Rev Target</th>`;
-    wkDates.forEach(dt => {
-      const d = parseInt(dt.slice(8,10));
+    const wks = weekDates(mo);
+    const moStr = `${year}-${String(mo).padStart(2,'0')}`;
+    const isFutureMo = todayStr < moStr+'-01';
+    const border = 'border-left:3px solid ' + (todayStr.startsWith(moStr)?'#6366f1':'#3d4168') + ';';
+    h2 += `<th class="num" style="background:#141628;${border}${P};color:#facc15;font-size:0.68rem;white-space:nowrap">Target</th>`;
+    wks.forEach(dt => {
       const isFut = dt > todayStr;
-      h2 += `<th class="num" style="background:#141628;${cellPad};font-size:0.65rem;white-space:nowrap;color:${isFut?'#2d3148':'#6b7280'}">${MO[mo-1]} ${d}</th>`;
+      const d = parseInt(dt.slice(8,10));
+      h2 += `<th class="num" style="background:#141628;${P};font-size:0.65rem;white-space:nowrap;color:${isFut?'#2d3148':'#6b7280'}">${MO[mo-1]} ${d}</th>`;
     });
+    h2 += `<th class="num" style="background:#141628;${P};font-size:0.65rem;white-space:nowrap;color:${isFutureMo?'#2d3148':'#6b7280'}">${isFutureMo?'Needed':'Gap'}</th>`;
   });
   h2 += '</tr>';
 
-  // ── Portfolio row ────────────────────────────────────────────────────────────
-  let portRow = `<tr style="background:#252840;border-bottom:2px solid #3d4168;border-top:2px solid #3d4168">
-    <td style="${stickyLeft};background:#252840;${cellPad};font-size:0.82rem;font-weight:700;color:#a78bfa;white-space:nowrap">Portfolio Total</td>
-    <td style="${cellPad};color:#6b7280;font-size:0.75rem;text-align:right">—</td>
-    <td style="${cellPad};color:#6b7280;font-size:0.75rem;text-align:right">—</td>`;
-  activeMos.forEach(mo => {
-    const wkDates = getWeekDates(mo);
-    const tgt = portTarget(mo);
-    portRow += `<td class="num" style="border-left:3px solid #3d4168;${cellPad};color:#facc15;font-weight:700;font-size:0.8rem;white-space:nowrap">${tgt>0?fmt(tgt):'—'}</td>`;
-    wkDates.forEach(dt => {
-      const isFut = dt > todayStr;
-      const actual = portCumRev(mo, dt);
-      const pct = tgt>0 && actual>0 ? actual/tgt*100 : null;
-      const isCurrentWk = dt >= todayStr && (new Date(dt) - new Date(todayStr)) < 7*86400000;
-      let bg='', color='#e2e8f0';
-      if (isFut && actual===0) { color='#2d3148'; }
-      else if (actual===0) { bg='background:#3b1a1a;'; color='#f87171'; }
-      else if (pct!=null && pct>=100) { bg='background:#1e3a2f;'; color='#34d399'; }
-      else if (pct!=null && pct>=70) { color='#facc15'; }
-      else { color='#f87171'; }
-      const outline = isCurrentWk ? 'outline:2px solid #6366f1;outline-offset:-2px;' : '';
-      portRow += `<td class="num" style="${bg}${outline}${cellPad};white-space:nowrap">
-        <div style="font-size:0.8rem;font-weight:700;color:${color}">${isFut&&actual===0?'—':actual>0?fmtShort(actual):'$0'}</div>
-        ${pct!=null&&!isFut?`<div style="font-size:0.6rem;color:${color};margin-top:1px">${pct.toFixed(0)}%</div>`:''}
-      </td>`;
-    });
-  });
-  portRow += '</tr>';
-
-  // ── % to target row ──────────────────────────────────────────────────────────
-  let pctRow = `<tr style="background:#1a1d2e;border-bottom:2px solid #3d4168">
-    <td style="${stickyLeft};background:#1a1d2e;${cellPad};font-size:0.7rem;color:#6b7280;white-space:nowrap">% to Target</td>
-    <td></td><td></td>`;
-  activeMos.forEach(mo => {
-    const wkDates = getWeekDates(mo);
-    const tgt = portTarget(mo);
-    pctRow += `<td style="border-left:3px solid #3d4168"></td>`;
-    wkDates.forEach(dt => {
-      const isFut = dt > todayStr;
-      const actual = portCumRev(mo, dt);
-      const pct = tgt>0&&!isFut ? actual/tgt*100 : null;
-      const color = pct==null?'#2d3148':pct>=100?'#34d399':pct>=70?'#facc15':'#f87171';
-      const bg = pct!=null&&pct>=100?'background:#1e3a2f;':pct!=null&&pct<50?'background:#3b1a1a;':'';
-      pctRow += `<td class="num" style="${bg}${cellPad};font-size:0.72rem;color:${color};font-weight:700;white-space:nowrap">${pct!=null?pct.toFixed(0)+'%':'—'}</td>`;
-    });
-  });
-  pctRow += '</tr>';
-
-  // ── Property rows ────────────────────────────────────────────────────────────
-  let bodyHtml = portRow + pctRow;
-
-  sortedProps.forEach(p => {
-    const feePct = fees[p.id]?.value;
-    // Check if property has any data in this year
-    const hasAnyData = activeMos.some(mo => {
-      const t = (targets[p.id]||{})[mo];
-      const moStr = `${year}-${String(mo).padStart(2,'0')}`;
-      return (t&&!t.closed&&t.revenue_target>0) || Object.keys(revByPropDate[p.id]||{}).some(d=>d.startsWith(moStr));
-    });
-    if (!hasAnyData) return;
-
-    let row = `<tr style="border-bottom:1px solid #1e2035">
-      <td style="${stickyLeft};background:#1a1d2e;${cellPad};font-size:0.8rem;font-weight:600;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis">${p.name}</td>
-      <td class="num" style="${cellPad};color:#6b7280;font-size:0.75rem">${feePct!=null?feePct+'%':'—'}</td>`;
-
-    // Annual mgmt fee target (sum of monthly targets × fee %)
-    const annualMgmtFeeTarget = feePct ? activeMos.reduce((s,mo) => {
-      const t=(targets[p.id]||{})[mo];
-      return s+(t&&!t.closed&&t.revenue_target?t.revenue_target*(feePct/100):0);
-    },0) : 0;
-    row += `<td class="num" style="${cellPad};color:#a78bfa;font-size:0.75rem;white-space:nowrap">${annualMgmtFeeTarget>0?fmtShort(annualMgmtFeeTarget):'—'}</td>`;
+  // ── Build a row (shared by portfolio + property) ──────────────────────────
+  function buildRow(pid, label, labelStyle, rowStyle) {
+    const isPort = pid === '__port__';
+    let row = `<tr style="${rowStyle}">
+      <td style="${SL};${labelStyle};${P};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px">${label}</td>`;
 
     activeMos.forEach(mo => {
-      const t = (targets[p.id]||{})[mo];
-      const target = t&&!t.closed ? (t.revenue_target||0) : 0;
-      const isClosed = t?.closed;
-      const wkDates = getWeekDates(mo);
+      const moStr   = `${year}-${String(mo).padStart(2,'0')}`;
+      const isClosed= !isPort && (targets[pid]||{})[mo]?.closed;
+      const tgt     = isPort ? portTarget(mo) : propTarget(pid, mo);
+      const wks     = weekDates(mo);
+      const isFutureMo = todayStr < moStr+'-01';
+      const border  = 'border-left:3px solid ' + (todayStr.startsWith(moStr)?'#6366f1':'#3d4168') + ';';
+      const bg      = isPort ? 'background:#252840;' : '';
 
       // Target cell
-      row += `<td class="num" style="border-left:3px solid #3d4168;${cellPad};color:#facc15;font-weight:700;font-size:0.78rem;white-space:nowrap">${
-        target>0 ? fmt(target) : isClosed ? '<span style="color:#374151;font-size:0.7rem">Closed</span>' : '<span style="color:#374151">—</span>'
+      row += `<td class="num" style="${bg}${border}${P};color:#facc15;font-weight:700;font-size:0.8rem;white-space:nowrap">${
+        tgt>0 ? fmt(tgt) : isClosed ? '<span style="color:#374151;font-size:0.7rem">Closed</span>' : '<span style="color:#374151">—</span>'
       }</td>`;
 
       // Week cells
-      wkDates.forEach(dt => {
-        const isFut = dt > todayStr;
-        const actual = cumRev(p.id, mo, dt);
-        const isCurrentWk = dt >= todayStr && (new Date(dt) - new Date(todayStr)) < 7*86400000;
-        let bg='', color='#e2e8f0', displayVal;
-
-        if (isClosed) {
-          color='#374151'; displayVal='Closed';
-        } else if (isFut && actual===0) {
-          color='#2d3148'; displayVal='—';
-        } else if (actual===0 && target>0) {
-          bg='background:#3b1a1a;'; color='#f87171'; displayVal='$0';
-        } else if (actual===0) {
-          color='#374151'; displayVal='—';
-        } else if (target>0 && actual>=target) {
-          bg='background:#1e3a2f;'; color='#34d399'; displayVal=fmt(actual);
-        } else if (target>0 && actual >= target*0.7) {
-          color='#facc15'; displayVal=fmt(actual);
-        } else if (target>0) {
-          color='#f87171'; displayVal=fmt(actual);
-        } else {
-          color='#9ca3af'; displayVal=fmt(actual);
-        }
-
-        const outline = isCurrentWk ? 'outline:2px solid #6366f1;outline-offset:-2px;' : '';
-        row += `<td class="num" style="${bg}${outline}${cellPad};font-size:0.78rem;color:${color};white-space:nowrap;font-weight:${actual>0?'600':'400'}">${displayVal}</td>`;
+      wks.forEach(dt => {
+        const isFut   = dt > todayStr;
+        const actual  = isPort ? portCum(mo,dt) : cumRev(pid,mo,dt);
+        const isNow   = !isFut && (new Date(todayStr)-new Date(dt)) < 8*86400000;
+        const { bg: cBg, color } = cellStyle(actual, tgt, isFut, isClosed);
+        const pct     = tgt>0&&actual>0&&!isFut ? (actual/tgt*100).toFixed(0)+'%' : '';
+        const outline = isNow ? 'outline:2px solid #6366f1;outline-offset:-2px;' : '';
+        row += `<td class="num" style="${bg}${cBg}${outline}${P};white-space:nowrap">
+          <div style="font-size:0.8rem;font-weight:600;color:${color}">${isFut&&!actual?'—':actual?fmtShort(actual):'$0'}</div>
+          ${pct?`<div style="font-size:0.6rem;color:${color};margin-top:1px">${pct}</div>`:''}
+        </td>`;
       });
+
+      // Gap / Needed cell
+      const finalActual = isPort ? portCum(mo, monthEnd(mo)) : cumRev(pid, mo, monthEnd(mo));
+      let gapVal = '', gapColor = '#6b7280';
+      if (isClosed) {
+        gapVal = '<span style="color:#374151;font-size:0.7rem">—</span>';
+      } else if (tgt>0) {
+        const gap = finalActual - tgt;
+        if (isFutureMo) {
+          gapVal = `<span style="color:#6b7280;font-size:0.78rem">${fmt(tgt)}</span>`;
+        } else {
+          gapColor = gap>=0 ? '#34d399' : '#f87171';
+          gapVal = `<span style="color:${gapColor};font-weight:700;font-size:0.78rem">${gap>=0?'+':''}${fmtShort(gap)}</span>`;
+        }
+      } else if (finalActual>0) {
+        gapVal = `<span style="color:#9ca3af;font-size:0.78rem">${fmtShort(finalActual)}</span>`;
+      } else {
+        gapVal = '<span style="color:#374151">—</span>';
+      }
+      row += `<td class="num" style="${bg}${P};white-space:nowrap">${gapVal}</td>`;
     });
 
     row += '</tr>';
-    bodyHtml += row;
-  });
+    return row;
+  }
+
+  // Portfolio row
+  const portRow = buildRow(
+    '__port__',
+    'Portfolio Total',
+    'background:#252840;font-size:0.82rem;font-weight:700;color:#a78bfa',
+    'background:#252840;border-top:2px solid #3d4168;border-bottom:2px solid #3d4168'
+  );
+
+  // Property rows
+  const propRows = sortedProps.map(p =>
+    buildRow(p.id, p.name, 'background:#1a1d2e;font-size:0.8rem;font-weight:600;color:#e2e8f0', 'border-bottom:1px solid #1e2035')
+  ).join('');
 
   document.getElementById('wkHead').innerHTML = h1 + h2;
-  document.getElementById('wkBody').innerHTML = bodyHtml;
+  document.getElementById('wkBody').innerHTML = portRow + propRows;
 }
 
 // ── Main render dispatch ─────────────────────────────────────────────────────
