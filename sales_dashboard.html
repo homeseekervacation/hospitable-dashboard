@@ -398,8 +398,8 @@
       <div class="cw" style="height:180px"><canvas id="cMonthly"></canvas></div>
     </div>
     <div class="card">
-      <div class="card-title">Leads by Pipeline</div>
-      <div class="card-sub">Distribution across all 5 pipelines</div>
+      <div class="card-title">Cottage Leads Pipeline</div>
+      <div class="card-sub">342 total leads in primary pipeline</div>
       <div class="cw" style="height:180px"><canvas id="cPipeline"></canvas></div>
     </div>
   </div>
@@ -925,9 +925,10 @@ function initCharts() {
     }
   });
 
-  // Pipeline bar horizontal
-  mkBar('cPipeline', DATA.pipelines.map(p => p.name), DATA.pipelines.map(p => p.count), {
-    colors: DATA.pipelines.map(p => p.color), horizontal: true
+  // Pipeline bar horizontal — Cottage Leads only
+  const cottagePips = DATA.pipelines.filter(p => p.name === 'Cottage Leads');
+  mkBar('cPipeline', cottagePips.map(p => p.name), cottagePips.map(p => p.count), {
+    colors: cottagePips.map(p => p.color), horizontal: true
   });
 
   // Conversion horizontal bar
