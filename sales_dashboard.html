@@ -445,8 +445,8 @@
   <div class="row row-11">
     <div class="card">
       <div class="card-title">GHL Agreed Value vs Revenue Target</div>
-      <div class="card-sub">Per deal — matched properties only (16 of 22)</div>
-      <div class="cw" style="height:230px"><canvas id="cDealCompare"></canvas></div>
+      <div class="card-sub">Per deal — matched properties only (17 of 23) · YoY % vs 2025 in tooltip</div>
+      <div class="cw" style="height:270px"><canvas id="cDealCompare"></canvas></div>
     </div>
     <div class="card">
       <div class="card-title">Days to Close — Distribution</div>
@@ -457,7 +457,7 @@
 
   <div class="row row-1">
     <div class="card">
-      <div class="card-title">Won Deals — All 22</div>
+      <div class="card-title">Won Deals — All 23</div>
       <div class="card-sub">GHL agreed value · 2026 revenue target · 2026 YTD actual from Hospitable API (Jan–Mar 24)</div>
       <div class="tbl-wrap">
         <table>
@@ -578,30 +578,31 @@ const DATA = {
   // target = 2026 annual revenue projection from HS Financial Dashboard (revenue_targets.csv)
   // target=0 means property not yet in financial dashboard (newer clients)
   // actualYTD = 2026 host revenue Jan–Mar from Hospitable API (CAD, as of Mar 24 2026)
+  // actual2025 = full-year 2025 host revenue from revenue_targets.csv
   wonDeals: [
-    {"name":"253 Crescent Bay-Vibish Gurumurthi","value":40000,"target":28100,  "actualYTD":3698,  "days":7,  "closedAt":"2026-02-04","pipeline":"Cottage Leads"},
-    {"name":"157 Menominee-Francisco",           "value":55000,"target":56400,  "actualYTD":0,     "days":45, "closedAt":"2026-02-02","pipeline":"Cottage Leads"},
-    {"name":"5441-10 Sideroad-Kirill",           "value":1500, "target":0,      "actualYTD":0,     "days":273,"closedAt":"2025-08-19","pipeline":"Cottage Leads"},
-    {"name":"Lauren-1169 Leonard Lake",          "value":54000,"target":65747,  "actualYTD":15084, "days":124,"closedAt":"2025-08-19","pipeline":"Cottage Leads"},
-    {"name":"Lori-1034 Centre Ave",              "value":65000,"target":85836,  "actualYTD":27054, "days":118,"closedAt":"2025-08-19","pipeline":"Cottage Leads"},
-    {"name":"2487 Falkenburg-Hannah Ulrich",     "value":50000,"target":0,      "actualYTD":0,     "days":89, "closedAt":"2025-08-19","pipeline":"Cottage Leads"},
-    {"name":"111 Wychwood-Warren Bell",          "value":5000, "target":37805,  "actualYTD":25201, "days":45, "closedAt":"2025-08-19","pipeline":"Cottage Leads"},
-    {"name":"Samantha-298 Highfield",            "value":65000,"target":56963,  "actualYTD":31973, "days":175,"closedAt":"2025-03-10","pipeline":"Cottage Leads"},
-    {"name":"Joanne-1053 Sanderson",             "value":75000,"target":77189,  "actualYTD":29334, "days":0,  "closedAt":"2025-02-27","pipeline":"Cottage Leads"},
-    {"name":"Michael-3B Barnsdale",              "value":65000,"target":54667,  "actualYTD":10955, "days":51, "closedAt":"2025-02-27","pipeline":"Cottage Leads"},
-    {"name":"Gobind-6893 Johnsonwagon",          "value":75000,"target":68908,  "actualYTD":9121,  "days":73, "closedAt":"2024-11-29","pipeline":"Cottage Leads"},
-    {"name":"Ira-10A Mckechnie",                 "value":10000,"target":0,      "actualYTD":0,     "days":13, "closedAt":"2024-09-10","pipeline":"Cottage Leads"},
-    {"name":"Loren-1356 Peninsula",              "value":20000,"target":37752,  "actualYTD":0,     "days":13, "closedAt":"2024-07-18","pipeline":"Cottage Leads"},
-    {"name":"Joanne-3014 Muskoka",               "value":85000,"target":123184, "actualYTD":33228, "days":9,  "closedAt":"2024-06-24","pipeline":"Cottage Leads"},
-    {"name":"Maribel Funtanilla",                "value":55000,"target":0,      "actualYTD":0,     "days":27, "closedAt":"2024-06-03","pipeline":"Cottage Leads"},
-    {"name":"Shona-1081 Bastedo",                "value":35000,"target":25938,  "actualYTD":9441,  "days":186,"closedAt":"2024-06-03","pipeline":"Cottage Leads"},
-    {"name":"Mahendra-130 Combe",                "value":58600,"target":61078,  "actualYTD":0,     "days":126,"closedAt":"2024-04-03","pipeline":"Cottage Leads"},
-    {"name":"Christine-23GlennBurney",           "value":155000,"target":191606,"actualYTD":40463, "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
-    {"name":"Jack-2108 S Orr",                   "value":30000,"target":0,      "actualYTD":0,     "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
-    {"name":"Akash-119 Minnetonka",              "value":105000,"target":115940,"actualYTD":49801, "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
-    {"name":"Danielle-619 Morningview",          "value":50000,"target":72326,  "actualYTD":30993, "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
-    {"name":"Daisy-9 Bexley",                    "value":35000,"target":0,      "actualYTD":0,     "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
-    {"name":"Cathy Lau",                          "value":50000,"target":0,      "actualYTD":0,     "days":254,"closedAt":"2026-03-24","pipeline":"Cottage Leads"}
+    {"name":"253 Crescent Bay-Vibish Gurumurthi","value":40000,"target":28100,  "actualYTD":3698,  "actual2025":0,      "days":7,  "closedAt":"2026-02-04","pipeline":"Cottage Leads"},
+    {"name":"157 Menominee-Francisco",           "value":55000,"target":56400,  "actualYTD":0,     "actual2025":0,      "days":45, "closedAt":"2026-02-02","pipeline":"Cottage Leads"},
+    {"name":"5441-10 Sideroad-Kirill",           "value":1500, "target":0,      "actualYTD":0,     "actual2025":0,      "days":273,"closedAt":"2025-08-19","pipeline":"Cottage Leads"},
+    {"name":"Lauren-1169 Leonard Lake",          "value":54000,"target":65747,  "actualYTD":15084, "actual2025":35542,  "days":124,"closedAt":"2025-08-19","pipeline":"Cottage Leads"},
+    {"name":"Lori-1034 Centre Ave",              "value":65000,"target":85836,  "actualYTD":27054, "actual2025":48436,  "days":118,"closedAt":"2025-08-19","pipeline":"Cottage Leads"},
+    {"name":"2487 Falkenburg-Hannah Ulrich",     "value":50000,"target":0,      "actualYTD":0,     "actual2025":0,      "days":89, "closedAt":"2025-08-19","pipeline":"Cottage Leads"},
+    {"name":"111 Wychwood-Warren Bell",          "value":5000, "target":37805,  "actualYTD":25201, "actual2025":7956,   "days":45, "closedAt":"2025-08-19","pipeline":"Cottage Leads"},
+    {"name":"Samantha-298 Highfield",            "value":65000,"target":56963,  "actualYTD":31973, "actual2025":5860,   "days":175,"closedAt":"2025-03-10","pipeline":"Cottage Leads"},
+    {"name":"Joanne-1053 Sanderson",             "value":75000,"target":77189,  "actualYTD":29334, "actual2025":77533,  "days":0,  "closedAt":"2025-02-27","pipeline":"Cottage Leads"},
+    {"name":"Michael-3B Barnsdale",              "value":65000,"target":54667,  "actualYTD":10955, "actual2025":5970,   "days":51, "closedAt":"2025-02-27","pipeline":"Cottage Leads"},
+    {"name":"Gobind-6893 Johnsonwagon",          "value":75000,"target":68908,  "actualYTD":9121,  "actual2025":67453,  "days":73, "closedAt":"2024-11-29","pipeline":"Cottage Leads"},
+    {"name":"Ira-10A Mckechnie",                 "value":10000,"target":0,      "actualYTD":0,     "actual2025":0,      "days":13, "closedAt":"2024-09-10","pipeline":"Cottage Leads"},
+    {"name":"Loren-1356 Peninsula",              "value":20000,"target":37752,  "actualYTD":0,     "actual2025":0,      "days":13, "closedAt":"2024-07-18","pipeline":"Cottage Leads"},
+    {"name":"Joanne-3014 Muskoka",               "value":85000,"target":123184, "actualYTD":33228, "actual2025":84466,  "days":9,  "closedAt":"2024-06-24","pipeline":"Cottage Leads"},
+    {"name":"Maribel Funtanilla",                "value":55000,"target":0,      "actualYTD":0,     "actual2025":0,      "days":27, "closedAt":"2024-06-03","pipeline":"Cottage Leads"},
+    {"name":"Shona-1081 Bastedo",                "value":35000,"target":25938,  "actualYTD":9441,  "actual2025":0,      "days":186,"closedAt":"2024-06-03","pipeline":"Cottage Leads"},
+    {"name":"Mahendra-130 Combe",                "value":58600,"target":61078,  "actualYTD":0,     "actual2025":44735,  "days":126,"closedAt":"2024-04-03","pipeline":"Cottage Leads"},
+    {"name":"Christine-23GlennBurney",           "value":155000,"target":191606,"actualYTD":40463, "actual2025":162796, "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
+    {"name":"Jack-2108 S Orr",                   "value":30000,"target":0,      "actualYTD":0,     "actual2025":0,      "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
+    {"name":"Akash-119 Minnetonka",              "value":105000,"target":115940,"actualYTD":49801, "actual2025":92698,  "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
+    {"name":"Danielle-619 Morningview",          "value":50000,"target":72326,  "actualYTD":30993, "actual2025":50053,  "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
+    {"name":"Daisy-9 Bexley",                    "value":35000,"target":0,      "actualYTD":0,     "actual2025":0,      "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
+    {"name":"Cathy Lau-1086 Woodwinds",          "value":50000,"target":54000,  "actualYTD":0,     "actual2025":0,      "days":254,"closedAt":"2026-03-24","pipeline":"Cottage Leads"}
   ],
   portfolioTarget: 1535865, // total 2026 annual target across all 29 properties (revenue_targets.csv)
 
@@ -875,25 +876,37 @@ function initTabCharts(id) {
     });
     mkBar('cCloseTime', Object.keys(buckets), Object.values(buckets), { colors: '#6c63ff' });
 
-    // GHL value vs Revenue Target comparison
+    // GHL value vs Revenue Target vs 2025 Actual comparison
     const matched = DATA.wonDeals.filter(d => d.target > 0).sort((a,b) => b.target - a.target);
     new Chart(document.getElementById('cDealCompare'), {
       type: 'bar',
       data: {
-        labels: matched.map(d => d.name.replace(/^[^-]+-/, '').split('-')[0].trim().slice(0,16)),
+        labels: matched.map(d => d.name.replace(/^[^-]+-/, '').split('-')[0].trim().slice(0,14)),
         datasets: [
-          { label: 'GHL Agreed Value',   data: matched.map(d => d.value),  backgroundColor: '#f59e0b', borderRadius: 3, borderWidth: 0 },
-          { label: '2026 Revenue Target', data: matched.map(d => d.target), backgroundColor: '#22c55e', borderRadius: 3, borderWidth: 0 }
+          { label: 'GHL Agreed Value',   data: matched.map(d => d.value),      backgroundColor: '#f59e0b', borderRadius: 3, borderWidth: 0 },
+          { label: '2026 Revenue Target', data: matched.map(d => d.target),     backgroundColor: '#22c55e', borderRadius: 3, borderWidth: 0 },
+          { label: '2025 Actual',         data: matched.map(d => d.actual2025 || 0), backgroundColor: '#6c63ff', borderRadius: 3, borderWidth: 0 }
         ]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
         plugins: {
           legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
-          tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtFull(ctx.raw)}` } }
+          tooltip: {
+            callbacks: {
+              label: ctx => ` ${ctx.dataset.label}: ${fmtFull(ctx.raw)}`,
+              afterBody: (items) => {
+                const d = matched[items[0].dataIndex];
+                if (!d.actual2025 || !d.target) return [];
+                const pct = Math.round((d.target - d.actual2025) / d.actual2025 * 100);
+                const sign = pct >= 0 ? '+' : '';
+                return [`  YoY (2026 target vs 2025 actual): ${sign}${pct}%`];
+              }
+            }
+          }
         },
         scales: {
-          x: { grid: { color: '#1e2235' }, ticks: { maxRotation: 40, font: { size: 9 } } },
+          x: { grid: { color: '#1e2235' }, ticks: { maxRotation: 45, font: { size: 9 } } },
           y: { grid: { color: '#1e2235' }, beginAtZero: true, ticks: { callback: fmt } }
         }
       }
