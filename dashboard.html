@@ -436,9 +436,21 @@
 <div class="page" id="page-weekly">
   <div class="main">
     <div class="card" style="padding:0;overflow:hidden">
-      <div style="padding:14px 20px;border-bottom:1px solid #2d3148;display:flex;align-items:center;gap:16px;flex-wrap:wrap">
-        <span style="font-size:0.82rem;font-weight:700;color:#e2e8f0;text-transform:uppercase;letter-spacing:0.5px">Weekly Revenue Tracker</span>
-        <span style="font-size:0.75rem;color:#6b7280">Cumulative monthly revenue per property, tracked week by week vs target. Green = at/above target · Red = $0 · Yellow = behind pace</span>
+      <div style="padding:12px 16px;border-bottom:1px solid #2d3148;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:0.82rem;font-weight:700;color:#e2e8f0;text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap">Weekly Tracker</span>
+        <span style="font-size:0.7rem;color:#6b7280;flex:1;min-width:160px">Past months = summary · Current month = weekly pace · Green ≥ target · Yellow = behind</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-left:auto">
+          <select id="wkPropFilter" onchange="renderWeekly(rawData, document.getElementById('yearFilter').value)" style="background:#1e2035;color:#e2e8f0;border:1px solid #3d4168;border-radius:6px;padding:5px 10px;font-size:0.73rem;min-width:140px;cursor:pointer">
+            <option value="all">All Properties</option>
+          </select>
+          <select id="wkSort" onchange="renderWeekly(rawData, document.getElementById('yearFilter').value)" style="background:#1e2035;color:#e2e8f0;border:1px solid #3d4168;border-radius:6px;padding:5px 10px;font-size:0.73rem;cursor:pointer">
+            <option value="rev_desc">Revenue ↓</option>
+            <option value="rev_asc">Revenue ↑</option>
+            <option value="gap_best">Gap: Best First</option>
+            <option value="gap_worst">Gap: Worst First</option>
+            <option value="name_az">Name A → Z</option>
+          </select>
+        </div>
       </div>
       <div style="overflow-x:auto;-webkit-overflow-scrolling:touch">
         <table id="wkTable" style="border-collapse:collapse;min-width:max-content;width:100%">
@@ -2199,17 +2211,19 @@ function tgtFilterClick(btn) {
 }
 
 // ── Weekly Tracker ────────────────────────────────────────────────────────────
+if (!window._wkExpanded) window._wkExpanded = {};  // persist expand state across re-renders
+
 function renderWeekly(data, yearFilter) {
   const year     = yearFilter === 'all' ? String(new Date().getFullYear()) : yearFilter;
   const targets  = data.revenue_targets || {};
   const props    = data.properties;
   const todayStr = new Date().toISOString().slice(0, 10);
   const MO       = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  const P        = 'padding:8px 12px';
+  const P        = 'padding:6px 10px';
+  const Ps       = 'padding:5px 8px';   // smaller for compact cols
   const SL       = 'position:sticky;left:0;z-index:1';
 
-  // Revenue lookup: propId → dateStr → amount
-  // Long stays (>30 nights) spread nightly across each date in the stay
+  // Revenue lookup: propId → dateStr → amount (long stays spread nightly)
   const revByPropDate = {};
   data.reservations.forEach(r => {
     if (!r.financials?.host?.revenue?.amount) return;
@@ -2223,29 +2237,20 @@ function renderWeekly(data, yearFilter) {
     });
   });
 
-  // Cumulative revenue for a property in a month up to a given date
   function cumRev(pid, mo, upTo) {
     const moStr = `${year}-${String(mo).padStart(2,'0')}`;
     return Object.entries(revByPropDate[pid] || {})
       .filter(([d]) => d.startsWith(moStr) && d <= upTo)
       .reduce((s, [, v]) => s + v, 0);
   }
+  function portCum(mo, upTo) { return props.reduce((s, p) => s + cumRev(p.id, mo, upTo), 0); }
 
-  // Portfolio cumulative across all properties
-  function portCum(mo, upTo) {
-    return props.reduce((s, p) => s + cumRev(p.id, mo, upTo), 0);
-  }
-
-  // Monthly target helpers
   function propTarget(pid, mo) {
     const t = (targets[pid] || {})[mo];
     return (t && !t.closed && t.revenue_target) ? t.revenue_target : 0;
   }
-  function portTarget(mo) {
-    return props.reduce((s, p) => s + propTarget(p.id, mo), 0);
-  }
+  function portTarget(mo) { return props.reduce((s, p) => s + propTarget(p.id, mo), 0); }
 
-  // Week-end reference dates within a month (7th, 14th, 21st, 28th, last day)
   function weekDates(mo) {
     const dim = new Date(parseInt(year), mo, 0).getDate();
     const out = [];
@@ -2253,8 +2258,18 @@ function renderWeekly(data, yearFilter) {
     if (dim > 28) out.push(`${year}-${String(mo).padStart(2,'0')}-${String(dim).padStart(2,'0')}`);
     return out;
   }
+  function monthEnd(mo) {
+    const dim = new Date(parseInt(year), mo, 0).getDate();
+    return `${year}-${String(mo).padStart(2,'0')}-${String(dim).padStart(2,'0')}`;
+  }
+  function moType(mo) {
+    const moStr = `${year}-${String(mo).padStart(2,'0')}`;
+    if (monthEnd(mo) < todayStr) return 'past';
+    if (todayStr < moStr + '-01') return 'future';
+    return 'current';
+  }
 
-  // Only show months that have a target or actual revenue
+  // Active months with data or targets
   const activeMos = Array.from({length:12},(_,i)=>i+1).filter(mo => {
     const moStr = `${year}-${String(mo).padStart(2,'0')}`;
     return props.some(p => {
@@ -2264,21 +2279,42 @@ function renderWeekly(data, yearFilter) {
     });
   });
 
-  // Month-end date string
-  function monthEnd(mo) {
-    const dim = new Date(parseInt(year), mo, 0).getDate();
-    return `${year}-${String(mo).padStart(2,'0')}-${String(dim).padStart(2,'0')}`;
+  // ── Controls ───────────────────────────────────────────────────────────────
+  const wkPropSel = document.getElementById('wkPropFilter');
+  if (wkPropSel && wkPropSel.options.length <= 1) {
+    [...props].sort((a,b) => a.name.localeCompare(b.name)).forEach(p => {
+      const o = document.createElement('option');
+      o.value = p.id; o.textContent = p.name;
+      wkPropSel.appendChild(o);
+    });
+  }
+  const propFilter = wkPropSel?.value || 'all';
+  const sortMode   = document.getElementById('wkSort')?.value || 'rev_desc';
+
+  // ── Sort & filter properties ───────────────────────────────────────────────
+  function propYearRev(p)  { return Object.values(revByPropDate[p.id]||{}).reduce((s,v)=>s+v,0); }
+  function propGapScore(p) {
+    let act = 0, tgt = 0;
+    activeMos.forEach(mo => {
+      if (moType(mo) === 'future') return;
+      act += cumRev(p.id, mo, monthEnd(mo));
+      tgt += propTarget(p.id, mo);
+    });
+    return tgt > 0 ? act / tgt : 0;
   }
 
-  // Sort props by year revenue desc
-  const sortedProps = [...props].sort((a,b) =>
-    Object.values(revByPropDate[b.id]||{}).reduce((s,v)=>s+v,0) -
-    Object.values(revByPropDate[a.id]||{}).reduce((s,v)=>s+v,0)
-  ).filter(p => activeMos.some(mo => {
+  let sortedProps = [...props].filter(p => activeMos.some(mo => {
     const moStr = `${year}-${String(mo).padStart(2,'0')}`;
     const t = (targets[p.id]||{})[mo];
     return (t&&!t.closed&&t.revenue_target>0) || Object.keys(revByPropDate[p.id]||{}).some(d=>d.startsWith(moStr));
   }));
+
+  sortedProps.sort((a,b) => propYearRev(b) - propYearRev(a));  // base: rev desc
+  if (sortMode === 'rev_asc')   sortedProps.sort((a,b) => propYearRev(a) - propYearRev(b));
+  if (sortMode === 'gap_best')  sortedProps.sort((a,b) => propGapScore(b) - propGapScore(a));
+  if (sortMode === 'gap_worst') sortedProps.sort((a,b) => propGapScore(a) - propGapScore(b));
+  if (sortMode === 'name_az')   sortedProps.sort((a,b) => a.name.localeCompare(b.name));
+  if (propFilter !== 'all')     sortedProps = sortedProps.filter(p => p.id === propFilter);
 
   // ── Colour helper ──────────────────────────────────────────────────────────
   function cellStyle(actual, target, isFuture, isClosed) {
@@ -2293,107 +2329,141 @@ function renderWeekly(data, yearFilter) {
     return { bg:'', color:'#f87171' };
   }
 
-  // ── Header ─────────────────────────────────────────────────────────────────
-  // Row 1: Month group labels
+  // Gap string helper
+  function gapBadge(actual, tgt, isClosed) {
+    if (isClosed) return { html:'<span style="color:#374151">—</span>', color:'#374151' };
+    if (!tgt)     return { html:'<span style="color:#374151">—</span>', color:'#374151' };
+    const gap = actual - tgt;
+    const color = gap >= 0 ? '#34d399' : '#f87171';
+    return { html:`<span style="color:${color};font-weight:700">${gap>=0?'+':''}${fmtShort(gap)}</span>`, color };
+  }
+
+  // ── Build headers ──────────────────────────────────────────────────────────
   let h1 = `<tr style="background:#0f1117">
-    <th style="${SL};background:#0f1117;min-width:175px;text-align:left;${P}"></th>`;
+    <th style="${SL};background:#0f1117;min-width:150px;text-align:left;${P}"></th>`;
+  let h2 = `<tr style="background:#141628">
+    <th style="${SL};background:#141628;text-align:left;${P};font-size:0.68rem;color:#6b7280">PROPERTY</th>`;
+
   activeMos.forEach(mo => {
-    const wks = weekDates(mo);
-    const isCurrentMo = todayStr.startsWith(`${year}-${String(mo).padStart(2,'0')}`);
-    const border = isCurrentMo ? 'border-left:3px solid #6366f1;' : 'border-left:3px solid #3d4168;';
-    // cols: Target + weeks + Gap
-    h1 += `<th colspan="${1+wks.length+1}" style="background:#0f1117;text-align:center;${border}${P};color:${isCurrentMo?'#6366f1':'#a78bfa'};font-size:0.8rem;font-weight:700">${MO[mo-1]} ${year}${isCurrentMo?' ●':''}</th>`;
+    const type    = moType(mo);
+    const moStr   = `${year}-${String(mo).padStart(2,'0')}`;
+    const isCurr  = type === 'current';
+    const isPast  = type === 'past';
+    const border  = `border-left:3px solid ${isCurr?'#6366f1':'#3d4168'};`;
+    const isExp   = window._wkExpanded[mo];   // only relevant for past months
+    const label   = `${MO[mo-1]} ${year}`;
+
+    if (isPast) {
+      const cols  = isExp ? 3 : 1;
+      const icon  = isExp ? '▾' : '▸';
+      // compute portfolio gap pct for collapsed badge
+      const portActual = portCum(mo, monthEnd(mo));
+      const portTgt    = portTarget(mo);
+      const gapPct     = portTgt>0 ? ((portActual/portTgt-1)*100).toFixed(0) : null;
+      const gapColor   = gapPct!==null ? (parseFloat(gapPct)>=0?'#34d399':'#f87171') : '#6b7280';
+      const badge      = gapPct!==null ? ` <span style="color:${gapColor};font-size:0.62rem">(${parseFloat(gapPct)>=0?'+':''}${gapPct}%)</span>` : '';
+      h1 += `<th colspan="${cols}" onclick="window._wkExpanded[${mo}]=!window._wkExpanded[${mo}];renderWeekly(rawData,'${year}')" style="background:#0f1117;text-align:center;${border}${Ps};color:#a78bfa;font-size:0.73rem;font-weight:700;cursor:pointer;user-select:none;white-space:nowrap">${icon} ${label}${isExp?'':badge}</th>`;
+      if (isExp) {
+        h2 += `<th class="num" style="background:#141628;${border}${Ps};color:#facc15;font-size:0.63rem;white-space:nowrap">Target</th>`;
+        h2 += `<th class="num" style="background:#141628;${Ps};font-size:0.63rem;white-space:nowrap;color:#6b7280">Actual</th>`;
+        h2 += `<th class="num" style="background:#141628;${Ps};font-size:0.63rem;white-space:nowrap;color:#6b7280">Gap</th>`;
+      } else {
+        h2 += `<th class="num" style="background:#141628;${border}${Ps};font-size:0.63rem;white-space:nowrap;color:#6b7280">Gap</th>`;
+      }
+    } else if (isCurr) {
+      const wks = weekDates(mo);
+      h1 += `<th colspan="${2+wks.length}" style="background:#0f1117;text-align:center;${border}${P};color:#6366f1;font-size:0.75rem;font-weight:700;white-space:nowrap">${label} ●</th>`;
+      h2 += `<th class="num" style="background:#141628;${border}${P};color:#facc15;font-size:0.63rem;white-space:nowrap">Target</th>`;
+      wks.forEach(dt => {
+        const d = parseInt(dt.slice(8,10));
+        const isFut = dt > todayStr;
+        h2 += `<th class="num" style="background:#141628;${P};font-size:0.6rem;white-space:nowrap;color:${isFut?'#2d3148':'#6b7280'}">${MO[mo-1]}&nbsp;${d}</th>`;
+      });
+      h2 += `<th class="num" style="background:#141628;${P};font-size:0.63rem;white-space:nowrap;color:#6b7280">Gap</th>`;
+    } else {
+      // future — 1 col only
+      h1 += `<th colspan="1" style="background:#0f1117;text-align:center;${border}${Ps};color:#2d3148;font-size:0.73rem;font-weight:700;white-space:nowrap">${label}</th>`;
+      h2 += `<th class="num" style="background:#141628;${border}${Ps};font-size:0.63rem;white-space:nowrap;color:#2d3148">Target</th>`;
+    }
   });
   h1 += '</tr>';
-
-  // Row 2: Sub-column labels
-  let h2 = `<tr style="background:#141628">
-    <th style="${SL};background:#141628;text-align:left;${P};font-size:0.7rem;color:#6b7280">Property</th>`;
-  activeMos.forEach(mo => {
-    const wks = weekDates(mo);
-    const moStr = `${year}-${String(mo).padStart(2,'0')}`;
-    const isFutureMo = todayStr < moStr+'-01';
-    const border = 'border-left:3px solid ' + (todayStr.startsWith(moStr)?'#6366f1':'#3d4168') + ';';
-    h2 += `<th class="num" style="background:#141628;${border}${P};color:#facc15;font-size:0.68rem;white-space:nowrap">Target</th>`;
-    wks.forEach(dt => {
-      const isFut = dt > todayStr;
-      const d = parseInt(dt.slice(8,10));
-      h2 += `<th class="num" style="background:#141628;${P};font-size:0.65rem;white-space:nowrap;color:${isFut?'#2d3148':'#6b7280'}">${MO[mo-1]} ${d}</th>`;
-    });
-    h2 += `<th class="num" style="background:#141628;${P};font-size:0.65rem;white-space:nowrap;color:${isFutureMo?'#2d3148':'#6b7280'}">${isFutureMo?'Needed':'Gap'}</th>`;
-  });
   h2 += '</tr>';
 
-  // ── Build a row (shared by portfolio + property) ──────────────────────────
+  // ── Build a data row ───────────────────────────────────────────────────────
   function buildRow(pid, label, labelStyle, rowStyle) {
     const isPort = pid === '__port__';
     let row = `<tr style="${rowStyle}">
-      <td style="${SL};${labelStyle};${P};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px">${label}</td>`;
+      <td style="${SL};${labelStyle};${P};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px">${label}</td>`;
 
     activeMos.forEach(mo => {
-      const moStr   = `${year}-${String(mo).padStart(2,'0')}`;
-      const isClosed= !isPort && (targets[pid]||{})[mo]?.closed;
-      const tgt     = isPort ? portTarget(mo) : propTarget(pid, mo);
-      const wks     = weekDates(mo);
-      const isFutureMo = todayStr < moStr+'-01';
-      const border  = 'border-left:3px solid ' + (todayStr.startsWith(moStr)?'#6366f1':'#3d4168') + ';';
-      const bg      = isPort ? 'background:#252840;' : '';
+      const type     = moType(mo);
+      const moStr    = `${year}-${String(mo).padStart(2,'0')}`;
+      const isClosed = !isPort && (targets[pid]||{})[mo]?.closed;
+      const tgt      = isPort ? portTarget(mo) : propTarget(pid, mo);
+      const bg       = isPort ? 'background:#252840;' : '';
+      const border   = `border-left:3px solid ${type==='current'?'#6366f1':'#3d4168'};`;
+      const isExp    = window._wkExpanded[mo];
 
-      // Target cell
-      row += `<td class="num" style="${bg}${border}${P};color:#facc15;font-weight:700;font-size:0.8rem;white-space:nowrap">${
-        tgt>0 ? fmt(tgt) : isClosed ? '<span style="color:#374151;font-size:0.7rem">Closed</span>' : '<span style="color:#374151">—</span>'
-      }</td>`;
+      if (type === 'past') {
+        const actual  = isPort ? portCum(mo, monthEnd(mo)) : cumRev(pid, mo, monthEnd(mo));
+        const { color } = cellStyle(actual, tgt, false, isClosed);
+        const { html: gapHtml } = gapBadge(actual, tgt, isClosed);
 
-      // Week cells
-      wks.forEach(dt => {
-        const isFut   = dt > todayStr;
-        const actual  = isPort ? portCum(mo,dt) : cumRev(pid,mo,dt);
-        const isNow   = !isFut && (new Date(todayStr)-new Date(dt)) < 8*86400000;
-        const { bg: cBg, color } = cellStyle(actual, tgt, isFut, isClosed);
-        const pct     = tgt>0&&actual>0&&!isFut ? (actual/tgt*100).toFixed(0)+'%' : '';
-        const outline = isNow ? 'outline:2px solid #6366f1;outline-offset:-2px;' : '';
-        row += `<td class="num" style="${bg}${cBg}${outline}${P};white-space:nowrap">
-          <div style="font-size:0.8rem;font-weight:600;color:${color}">${isFut&&!actual?'—':actual?fmtShort(actual):'$0'}</div>
-          ${pct?`<div style="font-size:0.6rem;color:${color};margin-top:1px">${pct}</div>`:''}
-        </td>`;
-      });
-
-      // Gap / Needed cell
-      const finalActual = isPort ? portCum(mo, monthEnd(mo)) : cumRev(pid, mo, monthEnd(mo));
-      let gapVal = '', gapColor = '#6b7280';
-      if (isClosed) {
-        gapVal = '<span style="color:#374151;font-size:0.7rem">—</span>';
-      } else if (tgt>0) {
-        const gap = finalActual - tgt;
-        if (isFutureMo) {
-          gapVal = `<span style="color:#6b7280;font-size:0.78rem">${fmt(tgt)}</span>`;
+        if (isExp) {
+          // Target
+          row += `<td class="num" style="${bg}${border}${Ps};color:#facc15;font-weight:700;font-size:0.75rem;white-space:nowrap">${tgt>0?fmt(tgt):isClosed?'<span style="color:#374151;font-size:0.68rem">Closed</span>':'<span style="color:#374151">—</span>'}</td>`;
+          // Actual
+          const pct = tgt>0&&actual>0 ? `<div style="font-size:0.56rem;color:${color};margin-top:1px">${(actual/tgt*100).toFixed(0)}%</div>` : '';
+          const { bg: cBg } = cellStyle(actual, tgt, false, isClosed);
+          row += `<td class="num" style="${bg}${cBg}${Ps};white-space:nowrap"><div style="font-size:0.75rem;font-weight:600;color:${color}">${actual?fmtShort(actual):'$0'}</div>${pct}</td>`;
+          // Gap
+          row += `<td class="num" style="${bg}${Ps};white-space:nowrap;font-size:0.75rem">${gapHtml}</td>`;
         } else {
-          gapColor = gap>=0 ? '#34d399' : '#f87171';
-          gapVal = `<span style="color:${gapColor};font-weight:700;font-size:0.78rem">${gap>=0?'+':''}${fmtShort(gap)}</span>`;
+          // Collapsed: just gap badge
+          row += `<td class="num" style="${bg}${border}${Ps};white-space:nowrap;font-size:0.75rem">${gapHtml}</td>`;
         }
-      } else if (finalActual>0) {
-        gapVal = `<span style="color:#9ca3af;font-size:0.78rem">${fmtShort(finalActual)}</span>`;
+
+      } else if (type === 'current') {
+        const wks = weekDates(mo);
+        // Target
+        row += `<td class="num" style="${bg}${border}${P};color:#facc15;font-weight:700;font-size:0.78rem;white-space:nowrap">${tgt>0?fmt(tgt):isClosed?'<span style="color:#374151;font-size:0.68rem">Closed</span>':'<span style="color:#374151">—</span>'}</td>`;
+        // Week cells
+        wks.forEach(dt => {
+          const isFut  = dt > todayStr;
+          const actual = isPort ? portCum(mo,dt) : cumRev(pid,mo,dt);
+          const isNow  = !isFut && (new Date(todayStr)-new Date(dt)) < 8*86400000;
+          const { bg: cBg, color } = cellStyle(actual, tgt, isFut, isClosed);
+          const pct = tgt>0&&actual>0&&!isFut ? `<div style="font-size:0.57rem;color:${color};margin-top:1px">${(actual/tgt*100).toFixed(0)}%</div>` : '';
+          const outline = isNow ? 'outline:2px solid #6366f1;outline-offset:-2px;' : '';
+          row += `<td class="num" style="${bg}${cBg}${outline}${P};white-space:nowrap">
+            <div style="font-size:0.78rem;font-weight:600;color:${color}">${isFut&&!actual?'—':actual?fmtShort(actual):'$0'}</div>${pct}
+          </td>`;
+        });
+        // Gap
+        const finalActual = isPort ? portCum(mo, monthEnd(mo)) : cumRev(pid, mo, monthEnd(mo));
+        const { html: gapHtml } = gapBadge(finalActual, tgt, isClosed);
+        row += `<td class="num" style="${bg}${P};white-space:nowrap;font-size:0.75rem">${gapHtml}</td>`;
+
       } else {
-        gapVal = '<span style="color:#374151">—</span>';
+        // Future: just target
+        row += `<td class="num" style="${bg}${border}${Ps};white-space:nowrap;color:#374151;font-size:0.73rem">${tgt>0?fmt(tgt):isClosed?'<span style="color:#374151;font-size:0.68rem">Closed</span>':'<span style="color:#374151">—</span>'}</td>`;
       }
-      row += `<td class="num" style="${bg}${P};white-space:nowrap">${gapVal}</td>`;
     });
 
     row += '</tr>';
     return row;
   }
 
-  // Portfolio row
-  const portRow = buildRow(
-    '__port__',
-    'Portfolio Total',
-    'background:#252840;font-size:0.82rem;font-weight:700;color:#a78bfa',
+  const portRow = propFilter === 'all' ? buildRow(
+    '__port__', 'Portfolio Total',
+    'background:#252840;font-size:0.8rem;font-weight:700;color:#a78bfa',
     'background:#252840;border-top:2px solid #3d4168;border-bottom:2px solid #3d4168'
-  );
+  ) : '';
 
-  // Property rows
   const propRows = sortedProps.map(p =>
-    buildRow(p.id, p.name, 'background:#1a1d2e;font-size:0.8rem;font-weight:600;color:#e2e8f0', 'border-bottom:1px solid #1e2035')
+    buildRow(p.id, p.name,
+      'background:#1a1d2e;font-size:0.77rem;font-weight:600;color:#e2e8f0',
+      'border-bottom:1px solid #1e2035')
   ).join('');
 
   document.getElementById('wkHead').innerHTML = h1 + h2;
