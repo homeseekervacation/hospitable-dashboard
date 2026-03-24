@@ -616,58 +616,144 @@ function getPropertyName(res) {
   return arr && arr.length ? arr[0].name || 'Unknown' : 'Unknown';
 }
 
+// ── Long-stay revenue splitting helpers ──────────────────────────────────────
+// For stays > 30 nights, split revenue proportionally across calendar months.
+// Cleaning fee is attributed to the first (arrival) month as a one-time charge.
+// Returns [{month:'YYYY-MM', revenue, nights, cleaningFee, bookings}]
+function revenueSlices(r) {
+  const nights = r.nights || 0;
+  const arrival   = (r.arrival_date   || r.check_in  || '').substring(0, 10);
+  const departure = (r.departure_date || r.check_out || '').substring(0, 10);
+  const totalRev  = (r.financials?.host?.revenue?.amount || 0) / 100;
+  const cleaning  = (r.financials?.host?.guest_fees || [])
+    .filter(f => /cleaning fee/i.test(f.label || ''))
+    .reduce((s, f) => s + (f.amount || 0), 0) / 100;
+
+  if (nights <= 30 || !arrival || !departure) {
+    return [{ month: departure.substring(0, 7), revenue: totalRev, nights, cleaningFee: cleaning, bookings: 1 }];
+  }
+
+  const nightsPerMonth = {};
+  const cur = new Date(arrival + 'T12:00:00Z');
+  const depDate = new Date(departure + 'T12:00:00Z');
+  let n = 0;
+  while (cur < depDate && n < nights + 5) {
+    const mo = cur.toISOString().substring(0, 7);
+    nightsPerMonth[mo] = (nightsPerMonth[mo] || 0) + 1;
+    cur.setUTCDate(cur.getUTCDate() + 1);
+    n++;
+  }
+
+  const accomRev = totalRev - cleaning;
+  return Object.entries(nightsPerMonth).map(([mo, n], i) => ({
+    month: mo,
+    revenue: accomRev * (n / nights) + (i === 0 ? cleaning : 0),
+    nights: n,
+    cleaningFee: i === 0 ? cleaning : 0,
+    bookings: i === 0 ? 1 : 0
+  }));
+}
+
+// For weekly tracker: spread long-stay revenue across individual dates.
+// Returns {dateStr: amount, ...}
+function revenueByDate(r) {
+  const nights = r.nights || 0;
+  const arrival   = (r.arrival_date   || r.check_in  || '').substring(0, 10);
+  const departure = (r.departure_date || r.check_out || '').substring(0, 10);
+  const totalRev  = (r.financials?.host?.revenue?.amount || 0) / 100;
+  const cleaning  = (r.financials?.host?.guest_fees || [])
+    .filter(f => /cleaning fee/i.test(f.label || ''))
+    .reduce((s, f) => s + (f.amount || 0), 0) / 100;
+
+  if (nights <= 30 || !arrival || !departure) {
+    return { [departure]: totalRev };
+  }
+
+  const perNight = (totalRev - cleaning) / nights;
+  const result = {};
+  const cur = new Date(arrival + 'T12:00:00Z');
+  const depDate = new Date(departure + 'T12:00:00Z');
+  let n = 0;
+  while (cur < depDate && n < nights + 5) {
+    const d = cur.toISOString().substring(0, 10);
+    result[d] = (result[d] || 0) + perNight + (n === 0 ? cleaning : 0);
+    cur.setUTCDate(cur.getUTCDate() + 1);
+    n++;
+  }
+  return result;
+}
+
 // ── Process financials ───────────────────────────────────────────────────────
 function processFinancials(data, yearFilter, propFilter, platFilter, asOf = null) {
   let reservations = data.reservations.filter(r => {
     const fin = r.financials;
     return fin && fin.host?.revenue?.amount > 0;
   });
-  if (yearFilter !== 'all') reservations = reservations.filter(r => (r.departure_date || r.check_out || '').startsWith(yearFilter));
+  // For long stays, include if any part overlaps the filter year
+  if (yearFilter !== 'all') {
+    reservations = reservations.filter(r => {
+      const dep = (r.departure_date || r.check_out || '');
+      const arr = (r.arrival_date   || r.check_in  || '');
+      if ((r.nights || 0) <= 30) return dep.startsWith(yearFilter);
+      return dep >= yearFilter + '-01-01' && (!arr || arr <= yearFilter + '-12-31');
+    });
+  }
   if (propFilter !== 'all') reservations = reservations.filter(r => r.properties?.[0]?.id === propFilter);
   if (platFilter !== 'all') reservations = reservations.filter(r => r.platform === platFilter);
   if (asOf) reservations = reservations.filter(r => (r.departure_date || r.check_out || '').slice(0,10) <= asOf);
 
   const byMonth = {}, byProp = {}, byPlatform = {}, byPropMonth = {};
+  let total = 0;
 
   reservations.forEach(r => {
     const fin = r.financials;
-    const revenue = (fin.host?.revenue?.amount || 0) / 100;
     const accommodation = (fin.host?.accommodation?.amount || 0) / 100;
     const hostFees = (fin.host?.host_fees || []).reduce((s, f) => s + f.amount, 0) / 100;
-    const cleaningFee = (fin.host?.guest_fees || []).filter(f => /cleaning fee/i.test(f.label || '')).reduce((s, f) => s + (f.amount || 0), 0) / 100;
-    const nights = r.nights || 0;
-    const date = (r.departure_date || r.check_out || '').substring(0, 7);
-    const propId = r.properties?.[0]?.id || 'unknown';
+    const propId   = r.properties?.[0]?.id || 'unknown';
     const propName = getPropertyName(r);
     const platform = r.platform || 'unknown';
+    const totalNights = r.nights || 0;
 
-    if (!byMonth[date]) byMonth[date] = { revenue: 0, bookings: 0, nights: 0 };
-    byMonth[date].revenue += revenue;
-    byMonth[date].bookings++;
-    byMonth[date].nights += nights;
+    const slices = revenueSlices(r);
+    const active  = yearFilter === 'all' ? slices : slices.filter(s => s.month.startsWith(yearFilter));
+    if (active.length === 0) return;
+
+    total++;
+    const yearRev     = active.reduce((s, sl) => s + sl.revenue, 0);
+    const yearNights  = active.reduce((s, sl) => s + sl.nights, 0);
+    const yearCleaning = active.reduce((s, sl) => s + sl.cleaningFee, 0);
+    const yearFrac    = totalNights > 0 ? yearNights / totalNights : 1;
 
     if (!byProp[propId]) byProp[propId] = { name: propName, revenue: 0, bookings: 0, nights: 0, accommodation: 0, hostFees: 0, cleaningFee: 0 };
-    byProp[propId].revenue += revenue;
+    byProp[propId].revenue      += yearRev;
     byProp[propId].bookings++;
-    byProp[propId].nights += nights;
-    byProp[propId].accommodation += accommodation;
-    byProp[propId].hostFees += hostFees;
-    byProp[propId].cleaningFee += cleaningFee;
+    byProp[propId].nights       += yearNights;
+    byProp[propId].accommodation += accommodation * yearFrac;
+    byProp[propId].hostFees     += hostFees * yearFrac;
+    byProp[propId].cleaningFee  += yearCleaning;
 
     if (!byPlatform[platform]) byPlatform[platform] = 0;
-    byPlatform[platform] += revenue;
+    byPlatform[platform] += yearRev;
 
-    if (!byPropMonth[propId]) byPropMonth[propId] = { name: propName };
-    if (!byPropMonth[propId][date]) byPropMonth[propId][date] = { revenue: 0, bookings: 0, nights: 0, accommodation: 0, hostFees: 0, cleaningFee: 0 };
-    byPropMonth[propId][date].revenue += revenue;
-    byPropMonth[propId][date].bookings++;
-    byPropMonth[propId][date].nights += nights;
-    byPropMonth[propId][date].accommodation += accommodation;
-    byPropMonth[propId][date].hostFees += hostFees;
-    byPropMonth[propId][date].cleaningFee += cleaningFee;
+    active.forEach(s => {
+      if (!byMonth[s.month]) byMonth[s.month] = { revenue: 0, bookings: 0, nights: 0 };
+      byMonth[s.month].revenue  += s.revenue;
+      byMonth[s.month].bookings += s.bookings;
+      byMonth[s.month].nights   += s.nights;
+
+      if (!byPropMonth[propId]) byPropMonth[propId] = { name: propName };
+      if (!byPropMonth[propId][s.month]) byPropMonth[propId][s.month] = { revenue: 0, bookings: 0, nights: 0, accommodation: 0, hostFees: 0, cleaningFee: 0 };
+      byPropMonth[propId][s.month].revenue      += s.revenue;
+      byPropMonth[propId][s.month].bookings     += s.bookings;
+      byPropMonth[propId][s.month].nights       += s.nights;
+      byPropMonth[propId][s.month].cleaningFee  += s.cleaningFee;
+      const sliceFrac = totalNights > 0 ? s.nights / totalNights : 0;
+      byPropMonth[propId][s.month].accommodation += accommodation * sliceFrac;
+      byPropMonth[propId][s.month].hostFees      += hostFees * sliceFrac;
+    });
   });
 
-  return { byMonth, byProp, byPlatform, byPropMonth, total: reservations.length };
+  return { byMonth, byProp, byPlatform, byPropMonth, total };
 }
 
 // ── Render financials page ───────────────────────────────────────────────────
@@ -1433,13 +1519,14 @@ function renderPropertyList(data, yearFilter) {
     if (!fin?.host?.revenue?.amount) return;
     const id = r.properties?.[0]?.id;
     if (!id) return;
-    const yr = (r.departure_date || r.check_out || '').substring(0, 4);  // group by checkout year
-    const rev = fin.host.revenue.amount / 100;
     if (!byPropYear[id]) byPropYear[id] = {};
-    if (!byPropYear[id][yr]) byPropYear[id][yr] = { revenue: 0, nights: 0, bookings: 0 };
-    byPropYear[id][yr].revenue += rev;
-    byPropYear[id][yr].nights += r.nights || 0;
-    byPropYear[id][yr].bookings++;
+    revenueSlices(r).forEach(s => {
+      const yr = s.month.substring(0, 4);
+      if (!byPropYear[id][yr]) byPropYear[id][yr] = { revenue: 0, nights: 0, bookings: 0 };
+      byPropYear[id][yr].revenue  += s.revenue;
+      byPropYear[id][yr].nights   += s.nights;
+      byPropYear[id][yr].bookings += s.bookings;
+    });
   });
 
   const pl = data.pricelabs_matched || {};
@@ -1527,30 +1614,42 @@ function renderPropertyDetail(data, propId, yearFilter) {
   // All reservations for this property (for YoY chart and byYear context)
   const allPropRes = data.reservations.filter(r => r.properties?.[0]?.id === propId && r.financials?.host?.revenue?.amount != null);
 
-  // Build byYear grouped by checkout year (for YoY chart + insights)
+  // Build byYear using monthly slices (long stays split across years)
   const byYear = {};
   allPropRes.forEach(r => {
-    const rev = r.financials.host.revenue.amount / 100;
-    const yr = (r.departure_date || r.check_out || '').substring(0, 4);
-    if (!byYear[yr]) byYear[yr] = { revenue: 0, bookings: 0, nights: 0 };
-    byYear[yr].revenue += rev; byYear[yr].bookings++; byYear[yr].nights += r.nights || 0;
+    revenueSlices(r).forEach(s => {
+      const yr = s.month.substring(0, 4);
+      if (!byYear[yr]) byYear[yr] = { revenue: 0, bookings: 0, nights: 0 };
+      byYear[yr].revenue  += s.revenue;
+      byYear[yr].bookings += s.bookings;
+      byYear[yr].nights   += s.nights;
+    });
   });
 
-  // Filter by checkout year; bucket monthly revenue by checkout date
-  const filteredRes = yearFilter === 'all' ? allPropRes : allPropRes.filter(r => (r.departure_date || r.check_out || '').startsWith(yearFilter));
+  // Filter reservations that overlap the year; bucket monthly revenue using slices
+  const filteredRes = yearFilter === 'all' ? allPropRes : allPropRes.filter(r => {
+    const dep = (r.departure_date || r.check_out || '');
+    const arr = (r.arrival_date   || r.check_in  || '');
+    if ((r.nights || 0) <= 30) return dep.startsWith(yearFilter);
+    return dep >= yearFilter + '-01-01' && (!arr || arr <= yearFilter + '-12-31');
+  });
   const byMonth = {};
   filteredRes.forEach(r => {
-    const rev = r.financials.host.revenue.amount / 100;
-    const cleaning = (r.financials.host?.guest_fees || []).filter(f => /cleaning fee/i.test(f.label || '')).reduce((s, f) => s + (f.amount || 0), 0) / 100;
-    const mo = (r.departure_date || r.check_out || '').substring(0, 7);
-    if (!byMonth[mo]) byMonth[mo] = { revenue: 0, bookings: 0, nights: 0, cleaningFee: 0 };
-    byMonth[mo].revenue += rev; byMonth[mo].bookings++; byMonth[mo].nights += r.nights || 0; byMonth[mo].cleaningFee += cleaning;
+    const slices = revenueSlices(r);
+    const active = yearFilter === 'all' ? slices : slices.filter(s => s.month.startsWith(yearFilter));
+    active.forEach(s => {
+      if (!byMonth[s.month]) byMonth[s.month] = { revenue: 0, bookings: 0, nights: 0, cleaningFee: 0 };
+      byMonth[s.month].revenue    += s.revenue;
+      byMonth[s.month].bookings   += s.bookings;
+      byMonth[s.month].nights     += s.nights;
+      byMonth[s.month].cleaningFee += s.cleaningFee;
+    });
   });
 
-  const totalRev = filteredRes.reduce((s, r) => s + r.financials.host.revenue.amount / 100, 0);
-  const totalCleaning = filteredRes.reduce((s, r) => s + (r.financials.host?.guest_fees || []).filter(f => /cleaning fee/i.test(f.label || '')).reduce((a, f) => a + (f.amount || 0), 0) / 100, 0);
-  const totalNights = filteredRes.reduce((s, r) => s + (r.nights || 0), 0);
-  const totalBookings = filteredRes.length;
+  const totalRev      = Object.values(byMonth).reduce((s, v) => s + v.revenue, 0);
+  const totalCleaning = Object.values(byMonth).reduce((s, v) => s + v.cleaningFee, 0);
+  const totalNights   = Object.values(byMonth).reduce((s, v) => s + v.nights, 0);
+  const totalBookings = Object.values(byMonth).reduce((s, v) => s + v.bookings, 0);
   const anr = totalNights > 0 ? totalRev / totalNights : 0;
   const abv = totalBookings > 0 ? totalRev / totalBookings : 0;
   const periodLabel = yearFilter === 'all' ? 'All time' : yearFilter;
@@ -1685,29 +1784,27 @@ function renderOverview(data, yearFilter) {
 
   const byPropMo = {};
   data.reservations.forEach(r => {
-    const dep = (r.departure_date || r.check_out || '');
-    if (!dep) return;
-    const yr = dep.substring(0,4);
-    const mo = parseInt(dep.substring(5,7), 10);
     const pid = (r.properties || [{}])[0]?.id || '';
     const rev = ((r.financials?.host?.revenue?.amount) || 0) / 100;
     if (!rev || !pid) return;
-    const nights  = r.nights || 0;
-    const cleaning = ((r.financials?.host?.guest_fees || []).filter(f => /cleaning/i.test(f.label||'')).reduce((s,f) => s+(f.amount||0),0)) / 100;
-    if (curYear && yr === curYear) {
-      portActual[mo-1] += rev;
-      totalRev    += rev;
-      totalClean  += cleaning;
-      totalNights += nights;
-      totalBookings++;
-      const fee = fees[pid];
-      if (fee) totalMgmt += (rev - cleaning) * (fee.value/100);
-      if (!byPropMo[pid]) byPropMo[pid] = {};
-      if (!byPropMo[pid][mo]) byPropMo[pid][mo] = { rev:0, nights:0 };
-      byPropMo[pid][mo].rev += rev;
-      byPropMo[pid][mo].nights += nights;
-    }
-    if (prevYear && yr === prevYear) prevTotalRev += rev;
+    revenueSlices(r).forEach(s => {
+      const yr = s.month.substring(0, 4);
+      const mo = parseInt(s.month.substring(5, 7), 10);
+      if (curYear && yr === curYear) {
+        portActual[mo-1] += s.revenue;
+        totalRev    += s.revenue;
+        totalClean  += s.cleaningFee;
+        totalNights += s.nights;
+        if (s.bookings) totalBookings++;
+        const fee = fees[pid];
+        if (fee) totalMgmt += (s.revenue - s.cleaningFee) * (fee.value/100);
+        if (!byPropMo[pid]) byPropMo[pid] = {};
+        if (!byPropMo[pid][mo]) byPropMo[pid][mo] = { rev:0, nights:0 };
+        byPropMo[pid][mo].rev    += s.revenue;
+        byPropMo[pid][mo].nights += s.nights;
+      }
+      if (prevYear && yr === prevYear) prevTotalRev += s.revenue;
+    });
   });
 
   // Portfolio projections per month
@@ -1844,12 +1941,13 @@ function renderOverview(data, yearFilter) {
   // Platform doughnut
   const platData = {};
   data.reservations.forEach(r => {
-    const dep = (r.departure_date || r.check_out || '');
-    if (curYear && !dep.startsWith(curYear)) return;
     const rev = ((r.financials?.host?.revenue?.amount) || 0) / 100;
     if (!rev) return;
     const plat = r.platform || 'other';
-    platData[plat] = (platData[plat] || 0) + rev;
+    revenueSlices(r).forEach(s => {
+      if (curYear && !s.month.startsWith(curYear)) return;
+      platData[plat] = (platData[plat] || 0) + s.revenue;
+    });
   });
   const platLabels = Object.keys(platData).sort((a,b) => platData[b]-platData[a]);
   const platColors = ['#6366f1','#34d399','#fb923c','#60a5fa','#a78bfa','#f87171','#2dd4bf'];
@@ -1904,17 +2002,18 @@ function renderTargets(data, yearFilter) {
   function buildActuals(reservations, year) {
     const byPropMo = {};
     reservations.forEach(r => {
-      const dep = (r.departure_date || r.check_out || '');
-      if (!dep || (year && !dep.startsWith(year))) return;
-      const mo  = parseInt(dep.substring(5, 7), 10);
       const pid = (r.properties || [{}])[0]?.id || '';
       if (!pid) return;
       const rev = ((r.financials?.host?.revenue?.amount) || 0) / 100;
       if (!rev) return;
-      if (!byPropMo[pid]) byPropMo[pid] = {};
-      if (!byPropMo[pid][mo]) byPropMo[pid][mo] = { rev: 0, nights: 0 };
-      byPropMo[pid][mo].rev    += rev;
-      byPropMo[pid][mo].nights += (r.nights || 0);
+      revenueSlices(r).forEach(s => {
+        if (year && !s.month.startsWith(year)) return;
+        const mo = parseInt(s.month.substring(5, 7), 10);
+        if (!byPropMo[pid]) byPropMo[pid] = {};
+        if (!byPropMo[pid][mo]) byPropMo[pid][mo] = { rev: 0, nights: 0 };
+        byPropMo[pid][mo].rev    += s.revenue;
+        byPropMo[pid][mo].nights += s.nights;
+      });
     });
     return byPropMo;
   }
@@ -2109,17 +2208,19 @@ function renderWeekly(data, yearFilter) {
   const P        = 'padding:8px 12px';
   const SL       = 'position:sticky;left:0;z-index:1';
 
-  // Revenue lookup: propId → dateStr → amount (by checkout date, from Hospitable)
+  // Revenue lookup: propId → dateStr → amount
+  // Long stays (>30 nights) spread nightly across each date in the stay
   const revByPropDate = {};
   data.reservations.forEach(r => {
     if (!r.financials?.host?.revenue?.amount) return;
-    const dep = (r.departure_date || r.check_out || '');
-    if (!dep.startsWith(year)) return;
     const pid = r.properties?.[0]?.id;
     if (!pid) return;
-    const rev = r.financials.host.revenue.amount / 100;
-    if (!revByPropDate[pid]) revByPropDate[pid] = {};
-    revByPropDate[pid][dep] = (revByPropDate[pid][dep] || 0) + rev;
+    const byDate = revenueByDate(r);
+    Object.entries(byDate).forEach(([d, v]) => {
+      if (!d.startsWith(year)) return;
+      if (!revByPropDate[pid]) revByPropDate[pid] = {};
+      revByPropDate[pid][d] = (revByPropDate[pid][d] || 0) + v;
+    });
   });
 
   // Cumulative revenue for a property in a month up to a given date
