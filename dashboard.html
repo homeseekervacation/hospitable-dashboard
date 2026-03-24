@@ -979,7 +979,7 @@ function applyMgmtFees(byProp, byPropMonth, fees) {
     const fee = fees[id];
     const pct = fee ? fee.value : 0;
     v.mgmtFeePct = pct;
-    v.mgmtFeeEarned = v.revenue * (pct / 100);
+    v.mgmtFeeEarned = (v.revenue - v.cleaningFee) * (pct / 100);
     v.mgmtFeeHst = v.mgmtFeeEarned * MGMT_FEE_HST;
     v.ownerPayout = v.revenue - v.cleaningFee - v.mgmtFeeEarned - v.mgmtFeeHst;
   });
@@ -989,7 +989,7 @@ function applyMgmtFees(byProp, byPropMonth, fees) {
     Object.entries(mData).forEach(([month, v]) => {
       if (month === 'name') return;
       v.mgmtFeePct = pct;
-      v.mgmtFeeEarned = v.revenue * (pct / 100);
+      v.mgmtFeeEarned = (v.revenue - v.cleaningFee) * (pct / 100);
       v.mgmtFeeHst = v.mgmtFeeEarned * MGMT_FEE_HST;
       v.ownerPayout = v.revenue - v.cleaningFee - v.mgmtFeeEarned - v.mgmtFeeHst;
     });
@@ -1096,7 +1096,7 @@ function renderGrossProfit(data, yearFilter, propFilter, platFilter) {
       gpByMonth[month].bookings += vals.bookings;
       gpByMonth[month].nights += vals.nights || 0;
       if (feePct != null) {
-        const fee = vals.revenue * feePct / 100;
+        const fee = (vals.revenue - (vals.cleaningFee || 0)) * feePct / 100;
         gpByMonth[month].mgmtFee += fee;
         gpByMonth[month].mgmtFeeHst += fee * MGMT_FEE_HST;
         gpByMonth[month].hasFee = true;
@@ -1628,7 +1628,7 @@ function renderPropertyDetail(data, propId, yearFilter) {
 
   // ── Gross Profit KPIs (filtered year) ──
   const feePct = feeData?.value;
-  const mgmtFeeYr  = feePct ? totalRev * feePct / 100 : null;
+  const mgmtFeeYr  = feePct ? (totalRev - totalCleaning) * feePct / 100 : null;
   const mgmtHstYr  = mgmtFeeYr != null ? mgmtFeeYr * MGMT_FEE_HST : null;
   const ownerYr    = mgmtFeeYr != null ? totalRev - totalCleaning - mgmtFeeYr - mgmtHstYr : null;
 
@@ -1644,9 +1644,9 @@ function renderPropertyDetail(data, propId, yearFilter) {
     type: 'bar',
     data: { labels: months.map(fmtMo), datasets: feePct ? [
       { label: 'Cleaning Fee', data: months.map(m => byMonth[m].cleaningFee || 0), backgroundColor: '#94a3b8', borderRadius: 4 },
-      { label: 'Mgmt Fee',     data: months.map(m => byMonth[m].revenue * feePct / 100), backgroundColor: '#a78bfa', borderRadius: 4 },
-      { label: 'HST (13%)',    data: months.map(m => byMonth[m].revenue * feePct / 100 * MGMT_FEE_HST), backgroundColor: '#f472b6', borderRadius: 4 },
-      { label: 'Owner Payout', data: months.map(m => byMonth[m].revenue - (byMonth[m].cleaningFee || 0) - byMonth[m].revenue * feePct / 100 * (1 + MGMT_FEE_HST)), backgroundColor: '#60a5fa', borderRadius: 4 }
+      { label: 'Mgmt Fee',     data: months.map(m => (byMonth[m].revenue - (byMonth[m].cleaningFee||0)) * feePct / 100), backgroundColor: '#a78bfa', borderRadius: 4 },
+      { label: 'HST (13%)',    data: months.map(m => (byMonth[m].revenue - (byMonth[m].cleaningFee||0)) * feePct / 100 * MGMT_FEE_HST), backgroundColor: '#f472b6', borderRadius: 4 },
+      { label: 'Owner Payout', data: months.map(m => byMonth[m].revenue - (byMonth[m].cleaningFee||0) - (byMonth[m].revenue - (byMonth[m].cleaningFee||0)) * feePct / 100 * (1 + MGMT_FEE_HST)), backgroundColor: '#60a5fa', borderRadius: 4 }
     ] : [
       { label: 'Revenue', data: months.map(m => byMonth[m].revenue), backgroundColor: '#6366f1', borderRadius: 4 }
     ]},
@@ -1701,7 +1701,7 @@ function renderOverview(data, yearFilter) {
       totalNights += nights;
       totalBookings++;
       const fee = fees[pid];
-      if (fee) totalMgmt += rev * (fee.value/100);
+      if (fee) totalMgmt += (rev - cleaning) * (fee.value/100);
       if (!byPropMo[pid]) byPropMo[pid] = {};
       if (!byPropMo[pid][mo]) byPropMo[pid][mo] = { rev:0, nights:0 };
       byPropMo[pid][mo].rev += rev;
