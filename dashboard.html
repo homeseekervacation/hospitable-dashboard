@@ -443,7 +443,7 @@
           <select id="wkPropFilter" onchange="renderWeekly(rawData, document.getElementById('yearFilter').value)" style="background:#1e2035;color:#e2e8f0;border:1px solid #3d4168;border-radius:6px;padding:5px 10px;font-size:0.73rem;min-width:140px;cursor:pointer">
             <option value="all">All Properties</option>
           </select>
-          <select id="wkSort" onchange="renderWeekly(rawData, document.getElementById('yearFilter').value)" style="background:#1e2035;color:#e2e8f0;border:1px solid #3d4168;border-radius:6px;padding:5px 10px;font-size:0.73rem;cursor:pointer">
+          <select id="wkSort" onchange="window._wkSortCol=null;renderWeekly(rawData, document.getElementById('yearFilter').value)" style="background:#1e2035;color:#e2e8f0;border:1px solid #3d4168;border-radius:6px;padding:5px 10px;font-size:0.73rem;cursor:pointer">
             <option value="rev_desc">Revenue ↓</option>
             <option value="rev_asc">Revenue ↑</option>
             <option value="gap_best">Gap: Best First</option>
@@ -2212,6 +2212,7 @@ function tgtFilterClick(btn) {
 
 // ── Weekly Tracker ────────────────────────────────────────────────────────────
 if (!window._wkExpanded) window._wkExpanded = {};  // persist expand state across re-renders
+if (window._wkSortCol === undefined) window._wkSortCol = null; // active column-click sort date
 
 function renderWeekly(data, yearFilter) {
   const year     = yearFilter === 'all' ? String(new Date().getFullYear()) : yearFilter;
@@ -2310,10 +2311,28 @@ function renderWeekly(data, yearFilter) {
   }));
 
   sortedProps.sort((a,b) => propYearRev(b) - propYearRev(a));  // base: rev desc
-  if (sortMode === 'rev_asc')   sortedProps.sort((a,b) => propYearRev(a) - propYearRev(b));
-  if (sortMode === 'gap_best')  sortedProps.sort((a,b) => propGapScore(b) - propGapScore(a));
-  if (sortMode === 'gap_worst') sortedProps.sort((a,b) => propGapScore(a) - propGapScore(b));
-  if (sortMode === 'name_az')   sortedProps.sort((a,b) => a.name.localeCompare(b.name));
+  // Column-click sort overrides the dropdown
+  if (window._wkSortCol) {
+    const col = window._wkSortCol;
+    if (col.startsWith('__gap__')) {
+      const mo = parseInt(col.replace('__gap__',''));
+      sortedProps.sort((a,b) => {
+        const gapA = cumRev(a.id, mo, monthEnd(mo)) - propTarget(a.id, mo);
+        const gapB = cumRev(b.id, mo, monthEnd(mo)) - propTarget(b.id, mo);
+        return gapB - gapA;
+      });
+    } else {
+      sortedProps.sort((a,b) => {
+        const mo = parseInt(col.substring(5,7));
+        return cumRev(b.id, mo, col) - cumRev(a.id, mo, col);
+      });
+    }
+  } else {
+    if (sortMode === 'rev_asc')   sortedProps.sort((a,b) => propYearRev(a) - propYearRev(b));
+    if (sortMode === 'gap_best')  sortedProps.sort((a,b) => propGapScore(b) - propGapScore(a));
+    if (sortMode === 'gap_worst') sortedProps.sort((a,b) => propGapScore(a) - propGapScore(b));
+    if (sortMode === 'name_az')   sortedProps.sort((a,b) => a.name.localeCompare(b.name));
+  }
   if (propFilter !== 'all')     sortedProps = sortedProps.filter(p => p.id === propFilter);
 
   // ── Colour helper ──────────────────────────────────────────────────────────
@@ -2377,9 +2396,17 @@ function renderWeekly(data, yearFilter) {
       wks.forEach(dt => {
         const d = parseInt(dt.slice(8,10));
         const isFut = dt > todayStr;
-        h2 += `<th class="num" style="background:#141628;${P};font-size:0.6rem;white-space:nowrap;color:${isFut?'#2d3148':'#6b7280'}">${MO[mo-1]}&nbsp;${d}</th>`;
+        const isActive = window._wkSortCol === dt;
+        const colBg = isActive ? 'background:#1e2045;' : 'background:#141628;';
+        const colColor = isActive ? '#a78bfa' : (isFut ? '#2d3148' : '#6b7280');
+        const sortArrow = isActive ? ' ↓' : '';
+        const cursor = isFut ? '' : 'cursor:pointer;user-select:none;';
+        const clickHandler = isFut ? '' : `onclick="window._wkSortCol=window._wkSortCol==='${dt}'?null:'${dt}';renderWeekly(rawData,'${year}')"`;
+        h2 += `<th class="num" ${clickHandler} style="${colBg}${P};font-size:0.6rem;white-space:nowrap;color:${colColor};${cursor}${isActive?'border-bottom:2px solid #a78bfa;':''}">${MO[mo-1]}&nbsp;${d}${sortArrow}</th>`;
       });
-      h2 += `<th class="num" style="background:#141628;${P};font-size:0.63rem;white-space:nowrap;color:#6b7280">Gap</th>`;
+      // Gap column also sortable
+      const isGapActive = window._wkSortCol === `__gap__${mo}`;
+      h2 += `<th class="num" onclick="window._wkSortCol=window._wkSortCol==='__gap__${mo}'?null:'__gap__${mo}';renderWeekly(rawData,'${year}')" style="background:${isGapActive?'#1e2045':'#141628'};${P};font-size:0.63rem;white-space:nowrap;color:${isGapActive?'#a78bfa':'#6b7280'};cursor:pointer;user-select:none;${isGapActive?'border-bottom:2px solid #a78bfa;':''}">Gap${isGapActive?' ↓':''}</th>`;
     } else {
       // future — 1 col only
       h1 += `<th colspan="1" style="background:#0f1117;text-align:center;${border}${Ps};color:#2d3148;font-size:0.73rem;font-weight:700;white-space:nowrap">${label}</th>`;
