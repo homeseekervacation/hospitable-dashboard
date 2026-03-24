@@ -273,6 +273,24 @@
   .pip-count { font-size: 20px; font-weight: 700; }
   .pip-stages { font-size: 10px; color: var(--muted); margin-top: 3px; }
 
+  /* Refresh button */
+  .refresh-btn { background: var(--card2); border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 11px; padding: 4px 12px; cursor: pointer; transition: all .15s; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+  .refresh-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .refresh-btn:disabled { opacity: .55; cursor: default; }
+  .refresh-spin { display: inline-block; animation: rspin .75s linear infinite; }
+  @keyframes rspin { to { transform: rotate(360deg); } }
+  /* Refresh toast */
+  .refresh-toast { position: fixed; bottom: 24px; right: 24px; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; z-index: 3000; min-width: 300px; box-shadow: 0 8px 28px rgba(0,0,0,.5); transform: translateY(16px); opacity: 0; transition: all .2s; pointer-events: none; }
+  .refresh-toast.show { transform: translateY(0); opacity: 1; pointer-events: all; }
+  .refresh-toast-hdr { font-size: 12px; font-weight: 700; margin-bottom: 10px; border-bottom: 1px solid var(--border); padding-bottom: 7px; }
+  .refresh-toast-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 5px; font-size: 11px; }
+  .refresh-toast-src { color: var(--muted); }
+  .refresh-toast-ok { color: var(--green); font-weight: 600; }
+  .refresh-toast-err { color: var(--red); font-size: 10px; }
+  .refresh-toast-warn { color: var(--amber); font-size: 10px; }
+  .refresh-toast-dismiss { display: block; margin-top: 10px; text-align: right; font-size: 10px; color: var(--muted); cursor: pointer; border: none; background: none; padding: 0; }
+  .refresh-toast-dismiss:hover { color: var(--text); }
+
   @media (max-width: 1000px) {
     .row-21,.row-12,.row-111,.row-11 { grid-template-columns: 1fr; }
     .pip-cards { grid-template-columns: repeat(2, 1fr); }
@@ -289,7 +307,8 @@
   <div class="header-right">
     <div class="hbadge">382 Leads · 5 Pipelines</div>
     <div class="updated" id="lastUpdated">Updated Mar 23, 2026</div>
-    <button class="settings-btn" onclick="openSettings()">⚙ GHL Sync <span class="sync-dot" id="syncDot"></span></button>
+    <button class="refresh-btn" id="refreshBtn" onclick="refreshAllData()">↻ Refresh</button>
+    <button class="settings-btn" onclick="openSettings()">⚙ Settings <span class="sync-dot" id="syncDot"></span></button>
   </div>
 </div>
 
@@ -579,15 +598,17 @@
 
 <!-- ── SETTINGS MODAL ── -->
 <div class="modal-bg" id="settingsModal" onclick="if(event.target===this)closeSettings()">
-  <div class="modal-box">
-    <h3>⚙ GHL CRM Sync</h3>
-    <p>Enter your GoHighLevel API token to automatically push sales updates as notes on each contact. The token is stored only in your browser's localStorage — never sent anywhere except GHL.</p>
-    <label class="modal-lbl">GHL API Token <span style="font-size:10px">(Settings → Integrations → Private Integration)</span></label>
+  <div class="modal-box" style="width:500px">
+    <h3>⚙ Data Sources &amp; Settings</h3>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:14px">Tokens are stored only in your browser's localStorage — never sent anywhere except the respective APIs.</p>
+    <label class="modal-lbl">GHL API Token <span style="font-size:10px">(GHL → Settings → Integrations → Private Integration)</span></label>
     <input class="modal-inp" id="ghlTokenInput" type="password" placeholder="eyJ0eXAiOiJKV1Qi...">
-    <label class="modal-lbl">Your Name <span style="font-size:10px">(used as note author)</span></label>
+    <label class="modal-lbl" style="margin-top:10px">Hospitable API Token <span style="font-size:10px">(Hospitable → Account → API Keys)</span></label>
+    <input class="modal-inp" id="hospTokenInput" type="password" placeholder="hs_live_...">
+    <label class="modal-lbl" style="margin-top:10px">Your Name <span style="font-size:10px">(used as note author in call logs &amp; GHL syncs)</span></label>
     <input class="modal-inp" id="defaultAuthorInput" type="text" placeholder="e.g. Edwin">
     <div class="modal-btns">
-      <button class="btn-secondary" onclick="clearGhlToken()">Clear Token</button>
+      <button class="btn-secondary" onclick="clearAllTokens()">Clear Tokens</button>
       <button class="btn-secondary" onclick="closeSettings()">Cancel</button>
       <button class="btn-primary" onclick="saveSettings()">Save</button>
     </div>
@@ -1764,26 +1785,32 @@ async function saveUpdate(sk, contactId) {
 // ═══════════════════ SETTINGS ═══════════════════
 function openSettings() {
   document.getElementById('settingsModal').classList.add('open');
-  document.getElementById('ghlTokenInput').value       = localStorage.getItem('hs_ghl_token')       || '';
-  document.getElementById('defaultAuthorInput').value  = localStorage.getItem('hs_default_author')  || '';
+  document.getElementById('ghlTokenInput').value      = localStorage.getItem('hs_ghl_token')         || '';
+  document.getElementById('hospTokenInput').value     = localStorage.getItem('hs_hospitable_token')   || '';
+  document.getElementById('defaultAuthorInput').value = localStorage.getItem('hs_default_author')     || '';
 }
 function closeSettings() { document.getElementById('settingsModal').classList.remove('open'); }
-function clearGhlToken() {
+function clearAllTokens() {
   localStorage.removeItem('hs_ghl_token');
-  document.getElementById('ghlTokenInput').value = '';
+  localStorage.removeItem('hs_hospitable_token');
+  document.getElementById('ghlTokenInput').value  = '';
+  document.getElementById('hospTokenInput').value = '';
   updateSyncDot();
 }
 function saveSettings() {
-  const token  = document.getElementById('ghlTokenInput').value.trim();
+  const ghl   = document.getElementById('ghlTokenInput').value.trim();
+  const hosp  = document.getElementById('hospTokenInput').value.trim();
   const author = document.getElementById('defaultAuthorInput').value.trim();
-  if (token)  localStorage.setItem('hs_ghl_token',      token);  else localStorage.removeItem('hs_ghl_token');
-  if (author) localStorage.setItem('hs_default_author', author); else localStorage.removeItem('hs_default_author');
+  if (ghl)    localStorage.setItem('hs_ghl_token',          ghl);    else localStorage.removeItem('hs_ghl_token');
+  if (hosp)   localStorage.setItem('hs_hospitable_token',   hosp);   else localStorage.removeItem('hs_hospitable_token');
+  if (author) localStorage.setItem('hs_default_author',     author); else localStorage.removeItem('hs_default_author');
   updateSyncDot();
   closeSettings();
 }
 function updateSyncDot() {
   const dot = document.getElementById('syncDot');
-  if (dot) dot.className = 'sync-dot' + (localStorage.getItem('hs_ghl_token') ? ' on' : '');
+  const hasTokens = !!(localStorage.getItem('hs_ghl_token') || localStorage.getItem('hs_hospitable_token'));
+  if (dot) dot.className = 'sync-dot' + (hasTokens ? ' on' : '');
 }
 
 // ── SMS Modal ──
@@ -1974,6 +2001,159 @@ function renderOutreachList() {
       </div>
     </div>
     ${html}`;
+}
+
+// ═══════════════════ DATA REFRESH ═══════════════════
+const GHL_BASE    = 'https://services.leadconnectorhq.com';
+const HOSP_BASE   = 'https://public.api.hospitable.com/v2';
+const GHL_LOC_ID  = 'OTJNyAUlz2jVzVLafkut';
+const GHL_WON_STAGE = 'cceebdc1-5a6d-45cd-a0c9-45ee9cab3404';
+
+async function refreshAllData() {
+  const btn = document.getElementById('refreshBtn');
+  if (btn.disabled) return;
+  const ghlToken  = localStorage.getItem('hs_ghl_token');
+  const hospToken = localStorage.getItem('hs_hospitable_token');
+  if (!ghlToken && !hospToken) { openSettings(); return; }
+  btn.innerHTML = '<span class="refresh-spin">↻</span> Refreshing…';
+  btn.disabled = true;
+  const results = {};
+  try {
+    if (ghlToken) {
+      try { results.ghl = await refreshGHLWonDeals(ghlToken); }
+      catch(e) { results.ghl = { error: e.message }; }
+    }
+    if (hospToken) {
+      try { results.hospitable = await refreshHospitableYTD(hospToken); }
+      catch(e) { results.hospitable = { error: e.message }; }
+    }
+    const now = new Date().toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+    document.getElementById('lastUpdated').textContent = `Refreshed ${now}`;
+  } finally {
+    btn.innerHTML = '↻ Refresh';
+    btn.disabled = false;
+  }
+  showRefreshToast(results, ghlToken, hospToken);
+}
+
+async function refreshGHLWonDeals(token) {
+  const res = await fetch(
+    `${GHL_BASE}/opportunities/search?location_id=${GHL_LOC_ID}&status=won&limit=100`,
+    { headers: { 'Authorization': `Bearer ${token}`, 'Version': '2021-07-28' } }
+  );
+  if (!res.ok) throw new Error(`GHL ${res.status}`);
+  const data = await res.json();
+  const opps = (data.opportunities || []).filter(o => o.pipelineStageId === GHL_WON_STAGE);
+
+  // Normalize name for fuzzy matching
+  const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const existingKeys = new Set(DATA.wonDeals.map(d => norm(d.name)));
+
+  let added = 0;
+  opps.forEach(o => {
+    const oNorm = norm(o.name);
+    const matched = [...existingKeys].some(k => {
+      if (k === oNorm) return true;
+      const [s, l] = k.length <= oNorm.length ? [k, oNorm] : [oNorm, k];
+      return s.length >= 6 && l.includes(s.slice(0, Math.min(s.length, 14)));
+    });
+    if (!matched) {
+      DATA.wonDeals.unshift({
+        name: o.name.trim(), value: o.monetaryValue || 0,
+        target: 0, actualYTD: 0, actual2025: 0, days: 0,
+        closedAt: (o.lastStatusChangeAt || o.dateAdded || '').slice(0,10),
+        pipeline: 'Cottage Leads'
+      });
+      existingKeys.add(oNorm);
+      added++;
+    }
+  });
+
+  if (added > 0) {
+    DATA.metrics.totalWon      = DATA.wonDeals.length;
+    DATA.metrics.totalWonValue = DATA.wonDeals.reduce((s, d) => s + (d.value || 0), 0);
+    const wonDist = DATA.statusDist.find(s => s.status === 'Won');
+    if (wonDist) wonDist.count = DATA.metrics.totalWon;
+    renderWonTable();
+    if (document.getElementById('tab-deals')?.classList.contains('active')) {
+      tabInited.deals = false; initTabCharts('deals');
+    }
+    renderOverviewSalesFocus();
+  }
+  return { total: opps.length, added };
+}
+
+async function refreshHospitableYTD(token) {
+  const headers = { 'Authorization': `Bearer ${token}`, 'Accept': 'application/json' };
+
+  // Fetch property IDs
+  const propsRes = await fetch(`${HOSP_BASE}/properties?per_page=100`, { headers });
+  if (!propsRes.ok) throw new Error(`Hospitable ${propsRes.status}`);
+  const propIds = ((await propsRes.json()).data || []).map(p => p.id);
+  if (!propIds.length) throw new Error('No properties found');
+
+  // Paginate 2026 accepted reservations with financials
+  const today = new Date().toISOString().slice(0,10);
+  let all = [], page = 1, lastPage = 1;
+  do {
+    const params = new URLSearchParams([
+      ...propIds.map(id => ['properties[]', id]),
+      ['page', page], ['per_page', 100],
+      ['include', 'financials'], ['status[]', 'accepted'],
+      ['start_date', '2026-01-01'], ['end_date', today]
+    ]);
+    const r = await fetch(`${HOSP_BASE}/reservations?${params}`, { headers });
+    if (!r.ok) throw new Error(`Hospitable reservations ${r.status}`);
+    const d = await r.json();
+    all.push(...(d.data || []));
+    lastPage = d.meta?.last_page || 1;
+    page++;
+  } while (page <= lastPage && page <= 20);
+
+  const withRevenue = all.filter(r => ((r.financials?.host?.revenue?.amount) || 0) > 0);
+  const ytd = Math.round(withRevenue.reduce((s, r) => s + (r.financials.host.revenue.amount || 0), 0));
+  const livePropCount = new Set(withRevenue.map(r => r.property_id || r.propertyId)).size;
+
+  DATA.hospitable.portfolioYTD   = ytd;
+  DATA.hospitable.acceptedRes    = withRevenue.length;
+  DATA.hospitable.propertiesLive = livePropCount;
+  DATA.hospitable.fetchedAt      = today;
+
+  renderOverviewSalesFocus();
+  return { ytd, reservations: withRevenue.length, properties: livePropCount };
+}
+
+function showRefreshToast(results, ghlToken, hospToken) {
+  let el = document.getElementById('refreshToast');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'refreshToast';
+    el.className = 'refresh-toast';
+    document.body.appendChild(el);
+  }
+  const rows = [];
+  if (results.ghl) {
+    rows.push(results.ghl.error
+      ? `<div class="refresh-toast-row"><span class="refresh-toast-src">GHL Won Deals</span><span class="refresh-toast-err">✗ ${results.ghl.error}</span></div>`
+      : `<div class="refresh-toast-row"><span class="refresh-toast-src">GHL Won Deals</span><span class="refresh-toast-ok">✓ ${results.ghl.total} deals${results.ghl.added > 0 ? ' · +' + results.ghl.added + ' new' : ' · up to date'}</span></div>`);
+  } else if (ghlToken) {
+    rows.push(`<div class="refresh-toast-row"><span class="refresh-toast-src">GHL Won Deals</span><span class="refresh-toast-warn">— skipped</span></div>`);
+  }
+  if (results.hospitable) {
+    rows.push(results.hospitable.error
+      ? `<div class="refresh-toast-row"><span class="refresh-toast-src">Hospitable YTD</span><span class="refresh-toast-err">✗ ${results.hospitable.error}</span></div>`
+      : `<div class="refresh-toast-row"><span class="refresh-toast-src">Hospitable YTD</span><span class="refresh-toast-ok">✓ $${(results.hospitable.ytd/1000).toFixed(0)}K · ${results.hospitable.reservations} bookings · ${results.hospitable.properties} props</span></div>`);
+  } else if (!hospToken) {
+    rows.push(`<div class="refresh-toast-row"><span class="refresh-toast-src">Hospitable YTD</span><span style="color:var(--muted);font-size:10px">Add token in ⚙ Settings to enable</span></div>`);
+  }
+  const now = new Date().toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+  el.innerHTML = `
+    <div class="refresh-toast-hdr">↻ Data Refresh — ${now}</div>
+    ${rows.join('')}
+    <button class="refresh-toast-dismiss" onclick="document.getElementById('refreshToast').classList.remove('show')">Dismiss ×</button>
+  `;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 8000);
 }
 
 // ═══════════════════ INIT ═══════════════════
