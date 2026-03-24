@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HS Sales Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --card2: #21253a;
+    --border: #2a2f45;
+    --text: #e2e8f0;
+    --muted: #8892a4;
+    --accent: #6c63ff;
+    --green: #22c55e;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --blue: #3b82f6;
+    --teal: #14b8a6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; font-size: 14px; }
+
+  .header { background: var(--card); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; justify-content: space-between; }
+  .header h1 { font-size: 17px; font-weight: 700; letter-spacing: -.3px; }
+  .header h1 span { color: var(--accent); }
+  .header-right { display: flex; align-items: center; gap: 10px; }
+  .hbadge { background: var(--card2); border: 1px solid var(--border); border-radius: 6px; padding: 3px 10px; font-size: 11px; color: var(--muted); }
+  .updated { font-size: 11px; color: var(--muted); }
+
+  .nav { background: var(--card); border-bottom: 1px solid var(--border); padding: 0 28px; display: flex; gap: 2px; }
+  .nav-btn { padding: 10px 16px; background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; font-weight: 500; border-bottom: 2px solid transparent; transition: all .15s; }
+  .nav-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .nav-btn:hover:not(.active) { color: var(--text); }
+
+  .container { padding: 22px 28px; max-width: 1600px; margin: 0 auto; }
+  .section { display: none; }
+  .section.active { display: block; }
+
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .kpi-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 15px 17px; }
+  .kpi-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 8px; }
+  .kpi-value { font-size: 24px; font-weight: 700; line-height: 1; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 5px; }
+  .c-green .kpi-value { color: var(--green); }
+  .c-blue .kpi-value { color: var(--blue); }
+  .c-amber .kpi-value { color: var(--amber); }
+  .c-accent .kpi-value { color: var(--accent); }
+  .c-teal .kpi-value { color: var(--teal); }
+  .c-red .kpi-value { color: var(--red); }
+
+  .row { display: grid; gap: 16px; margin-bottom: 16px; }
+  .row-21 { grid-template-columns: 2fr 1fr; }
+  .row-12 { grid-template-columns: 1fr 2fr; }
+  .row-11 { grid-template-columns: 1fr 1fr; }
+  .row-111 { grid-template-columns: 1fr 1fr 1fr; }
+  .row-1 { grid-template-columns: 1fr; }
+
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 18px 20px; }
+  .card-title { font-size: 12px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 2px; }
+  .card-sub { font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+
+  .toggle-group { display: flex; gap: 4px; margin-bottom: 12px; }
+  .tbtn { padding: 4px 12px; background: var(--card2); border: 1px solid var(--border); border-radius: 5px; color: var(--muted); cursor: pointer; font-size: 11px; font-weight: 600; transition: all .15s; }
+  .tbtn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .cw { position: relative; }
+
+  /* Funnel */
+  .funnel { display: flex; flex-direction: column; gap: 7px; }
+  .f-row { display: grid; grid-template-columns: 150px 1fr 40px 80px; align-items: center; gap: 10px; }
+  .f-label { font-size: 11px; color: var(--muted); text-align: right; }
+  .f-bar-bg { background: var(--card2); border-radius: 4px; height: 28px; overflow: hidden; }
+  .f-bar { height: 100%; border-radius: 4px; display: flex; align-items: center; padding: 0 10px; font-size: 11px; font-weight: 700; color: #fff; min-width: 28px; transition: width .7s ease; }
+  .f-count { font-size: 13px; font-weight: 700; text-align: right; }
+  .f-val { font-size: 10px; color: var(--muted); text-align: right; }
+
+  /* Table */
+  .tbl-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  thead th { padding: 8px 12px; text-align: left; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  tbody tr { border-bottom: 1px solid var(--border); }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--card2); }
+  tbody td { padding: 9px 12px; }
+  .st { display: inline-block; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+  .st-won { background: rgba(34,197,94,.15); color: var(--green); }
+  .st-open { background: rgba(59,130,246,.12); color: var(--blue); }
+  .st-lost { background: rgba(239,68,68,.12); color: var(--red); }
+  .st-abandoned { background: rgba(245,158,11,.12); color: var(--amber); }
+
+  /* Call update */
+  .doc-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .doc-hdr h2 { font-size: 15px; font-weight: 700; }
+  .doc-link { color: var(--accent); font-size: 11px; text-decoration: none; padding: 4px 10px; border: 1px solid var(--accent); border-radius: 5px; }
+  .doc-link:hover { background: rgba(108,99,255,.1); }
+  .week-block { margin-bottom: 24px; }
+  .week-hdr { font-size: 13px; font-weight: 700; color: var(--accent); padding: 7px 14px; background: rgba(108,99,255,.08); border-left: 3px solid var(--accent); border-radius: 0 6px 6px 0; margin-bottom: 10px; margin-top: 18px; }
+  .prospect-list { list-style: none; }
+  .p-item { display: flex; gap: 10px; padding: 7px 8px; border-radius: 6px; align-items: flex-start; }
+  .p-item:hover { background: var(--card2); }
+  .p-num { color: var(--muted); font-size: 11px; width: 18px; flex-shrink: 0; padding-top: 3px; }
+  .p-name { font-size: 13px; font-weight: 600; }
+  .p-detail { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .p-crm { display: flex; gap: 6px; margin-top: 4px; flex-wrap: wrap; }
+  .p-crm-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px; background: var(--card2); color: var(--muted); border: 1px solid var(--border); }
+  .p-crm-val { background: rgba(34,197,94,.1); color: var(--green); border-color: rgba(34,197,94,.2); }
+  .p-crm-stage { background: rgba(59,130,246,.1); color: var(--blue); border-color: rgba(59,130,246,.2); }
+  .p-crm-new { background: rgba(245,158,11,.1); color: var(--amber); border-color: rgba(245,158,11,.2); }
+  .tag { display: inline-block; padding: 1px 5px; border-radius: 3px; font-size: 9px; font-weight: 700; margin-left: 5px; vertical-align: middle; }
+  .tag-b { background: rgba(239,68,68,.15); color: var(--red); }
+  .tag-p { background: rgba(245,158,11,.15); color: var(--amber); }
+  .tag-c { background: rgba(34,197,94,.15); color: var(--green); }
+
+  /* Next Actions Board */
+  .na-priority { margin-bottom: 20px; }
+  .na-priority-hdr { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .na-priority-hdr span { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; }
+  .na-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .na-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }
+  .na-card { background: var(--card2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; border-left: 3px solid transparent; }
+  .na-card.p-fire { border-left-color: var(--red); }
+  .na-card.p-hot { border-left-color: var(--amber); }
+  .na-card.p-warm { border-left-color: var(--blue); }
+  .na-card.p-nurture { border-left-color: var(--muted); }
+  .na-name { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+  .na-prop { font-size: 11px; color: var(--muted); margin-bottom: 6px; }
+  .na-badges { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+  .na-badge { font-size: 9px; font-weight: 700; padding: 2px 6px; border-radius: 3px; }
+  .na-val { background: rgba(34,197,94,.12); color: var(--green); }
+  .na-stage { background: rgba(59,130,246,.12); color: var(--blue); }
+  .na-age { background: rgba(139,92,246,.12); color: #a78bfa; }
+  .na-src { background: rgba(20,184,166,.12); color: var(--teal); }
+  .na-action { font-size: 11px; color: var(--text); background: rgba(108,99,255,.08); border: 1px solid rgba(108,99,255,.2); border-radius: 5px; padding: 6px 9px; line-height: 1.5; }
+  .na-action strong { color: var(--accent); }
+  .na-note { font-size: 10px; color: var(--muted); margin-top: 5px; font-style: italic; line-height: 1.4; }
+
+  /* Per-card update log */
+  .na-updates { margin-top: 10px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,.07); }
+  .na-upd-hdr { display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px; }
+  .na-upd-lbl { font-size: 9px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .na-upd-toggle { background: none; border: 1px solid var(--border); border-radius: 3px; padding: 2px 8px; color: var(--muted); font-size: 9px; cursor: pointer; transition: all .15s; }
+  .na-upd-toggle:hover { border-color: var(--accent); color: var(--accent); }
+  .na-upd-log { display: none; margin-bottom: 7px; }
+  .na-upd-log.open { display: block; }
+  .na-upd-entry { padding: 5px 8px; margin-bottom: 4px; background: rgba(0,0,0,.2); border-radius: 4px; border-left: 2px solid var(--accent); }
+  .na-upd-meta { font-size: 9px; color: var(--muted); margin-bottom: 2px; }
+  .na-upd-text { font-size: 11px; color: var(--text); line-height: 1.45; }
+  .na-upd-form textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 11px; padding: 6px 8px; resize: none; font-family: inherit; height: 52px; transition: border-color .15s; box-sizing: border-box; }
+  .na-upd-form textarea:focus { outline: none; border-color: var(--accent); }
+  .na-upd-row { display: flex; gap: 5px; margin-top: 5px; }
+  .na-upd-author { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 11px; padding: 4px 7px; font-family: inherit; }
+  .na-upd-author:focus { outline: none; border-color: var(--accent); }
+  .na-save-btn { background: var(--accent); border: none; border-radius: 4px; color: #fff; font-size: 11px; font-weight: 700; padding: 4px 11px; cursor: pointer; white-space: nowrap; flex-shrink: 0; }
+  .na-save-btn:hover { background: #5a52d5; }
+  .na-save-btn:disabled { opacity: .5; cursor: default; }
+  .na-sync-status { font-size: 10px; margin-top: 3px; min-height: 14px; }
+  .sync-ok { color: var(--green); } .sync-err { color: var(--red); } .sync-ing { color: var(--muted); }
+
+  /* Settings modal */
+  .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 999; align-items: center; justify-content: center; }
+  .modal-bg.open { display: flex; }
+  .modal-box { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 24px 26px; width: 440px; max-width: 96vw; }
+  .modal-box h3 { font-size: 15px; font-weight: 700; margin-bottom: 5px; }
+  .modal-box p { font-size: 12px; color: var(--muted); line-height: 1.55; margin-bottom: 16px; }
+  .modal-lbl { font-size: 11px; color: var(--muted); margin-bottom: 4px; display: block; }
+  .modal-inp { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 5px; color: var(--text); font-size: 12px; padding: 7px 10px; font-family: inherit; margin-bottom: 14px; box-sizing: border-box; }
+  .modal-inp:focus { outline: none; border-color: var(--accent); }
+  .modal-btns { display: flex; gap: 8px; justify-content: flex-end; }
+  .btn-primary { background: var(--accent); border: none; border-radius: 5px; color: #fff; font-size: 12px; font-weight: 600; padding: 7px 18px; cursor: pointer; }
+  .btn-secondary { background: var(--card2); border: 1px solid var(--border); border-radius: 5px; color: var(--muted); font-size: 12px; padding: 7px 14px; cursor: pointer; }
+  .settings-btn { background: var(--card2); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; font-size: 11px; color: var(--muted); cursor: pointer; display: flex; align-items: center; gap: 5px; }
+  .settings-btn:hover { color: var(--text); border-color: var(--accent); }
+  .sync-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); display: inline-block; flex-shrink: 0; }
+  .sync-dot.on { background: var(--green); }
+
+  /* Overview — Sales Focus Panel */
+  .sf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 10px; margin-bottom: 10px; }
+  .sf-card { background: var(--card2); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; }
+  .sf-card-hdr { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 6px; }
+  .sf-card-val { font-size: 19px; font-weight: 700; line-height: 1; }
+  .sf-card-sub { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .sf-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .sf-item { display: flex; align-items: flex-start; gap: 7px; font-size: 11px; padding: 5px 0; border-bottom: 1px solid var(--border); }
+  .sf-item:last-child { border-bottom: none; }
+  .sf-item-name { font-weight: 700; min-width: 110px; }
+  .sf-item-detail { color: var(--muted); }
+  .sf-item-badge { margin-left: auto; flex-shrink: 0; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+  .sfb-fire { background: rgba(239,68,68,.15); color: var(--red); }
+  .sfb-hot  { background: rgba(245,158,11,.15); color: var(--amber); }
+  .sfb-warm { background: rgba(59,130,246,.12); color: var(--blue); }
+  .sf-divider { height: 1px; background: var(--border); margin: 14px 0; }
+  .sf-section-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); font-weight: 700; margin-bottom: 8px; }
+
+  /* Pipeline — Follow-Up Leads */
+  .fl-table-wrap { overflow-x: auto; }
+  .fl-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .fl-table thead th { padding: 7px 11px; text-align: left; font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .fl-table tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  .fl-table tbody tr:last-child { border-bottom: none; }
+  .fl-table tbody tr:hover { background: var(--card2); }
+  .fl-table tbody td { padding: 9px 11px; vertical-align: top; }
+  .fl-score { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; border-radius: 50%; font-size: 12px; font-weight: 700; }
+  .fl-score-high  { background: rgba(239,68,68,.15); color: var(--red); }
+  .fl-score-mid   { background: rgba(245,158,11,.15); color: var(--amber); }
+  .fl-score-low   { background: rgba(59,130,246,.12); color: var(--blue); }
+  .fl-eng { display: flex; gap: 3px; margin-top: 3px; }
+  .fl-eng-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); }
+  .fl-eng-dot.on { background: var(--accent); }
+  .fl-action-text { font-size: 11px; color: var(--muted); margin-top: 2px; max-width: 340px; }
+
+  /* Pipeline overview cards */
+  .pip-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
+  .pip-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .pip-name { font-size: 11px; color: var(--muted); margin-bottom: 5px; }
+  .pip-count { font-size: 20px; font-weight: 700; }
+  .pip-stages { font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+  @media (max-width: 1000px) {
+    .row-21,.row-12,.row-111,.row-11 { grid-template-columns: 1fr; }
+    .pip-cards { grid-template-columns: repeat(2, 1fr); }
+    .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+    .container { padding: 14px; }
+    .f-row { grid-template-columns: 110px 1fr 36px 60px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>HS <span>Sales Dashboard</span></h1>
+  <div class="header-right">
+    <div class="hbadge">382 Leads · 5 Pipelines</div>
+    <div class="updated" id="lastUpdated">Updated Mar 23, 2026</div>
+    <button class="settings-btn" onclick="openSettings()">⚙ GHL Sync <span class="sync-dot" id="syncDot"></span></button>
+  </div>
+</div>
+
+<div class="nav">
+  <button class="nav-btn active" onclick="showTab('overview',this)">Overview</button>
+  <button class="nav-btn" onclick="showTab('pipeline',this)">Pipeline</button>
+  <button class="nav-btn" onclick="showTab('deals',this)">Deals</button>
+  <button class="nav-btn" onclick="showTab('callupdate',this)">Call Update</button>
+</div>
+
+<div class="container">
+
+<!-- ── OVERVIEW ── -->
+<div class="section active" id="tab-overview">
+  <div class="kpi-grid">
+    <div class="kpi-card c-blue">
+      <div class="kpi-label">This Week</div>
+      <div class="kpi-value" id="k-week">0</div>
+      <div class="kpi-sub">New leads</div>
+    </div>
+    <div class="kpi-card c-accent">
+      <div class="kpi-label">This Month</div>
+      <div class="kpi-value" id="k-month">14</div>
+      <div class="kpi-sub">New leads (Mar)</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Total Leads</div>
+      <div class="kpi-value">382</div>
+      <div class="kpi-sub">All time</div>
+    </div>
+    <div class="kpi-card c-amber">
+      <div class="kpi-label">Open in Pipeline</div>
+      <div class="kpi-value">312</div>
+      <div class="kpi-sub">Active leads</div>
+    </div>
+    <div class="kpi-card c-green">
+      <div class="kpi-label">Won Deals</div>
+      <div class="kpi-value">23</div>
+      <div class="kpi-sub">$1,239,100 closed</div>
+    </div>
+    <div class="kpi-card c-teal">
+      <div class="kpi-label">Close Rate</div>
+      <div class="kpi-value">5.8%</div>
+      <div class="kpi-sub">Won / total leads</div>
+    </div>
+    <div class="kpi-card c-amber">
+      <div class="kpi-label">Pipeline Value</div>
+      <div class="kpi-value">$5.2M</div>
+      <div class="kpi-sub">Open opportunities</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Avg Close Time</div>
+      <div class="kpi-value">86d</div>
+      <div class="kpi-sub">Lead → Won</div>
+    </div>
+  </div>
+
+  <!-- Sales Team Focus -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">🎯 Sales Team Focus</div>
+    <div class="card-sub">Live snapshot across all tabs — priorities, pipeline at stake, deal health</div>
+    <div id="salesFocusEl"></div>
+  </div>
+
+  <div class="row row-21">
+    <div class="card">
+      <div class="card-title">Lead Flow</div>
+      <div class="card-sub">New leads entering the pipeline</div>
+      <div class="toggle-group">
+        <button class="tbtn active" onclick="switchFlow('weekly',this)">Weekly</button>
+        <button class="tbtn" onclick="switchFlow('monthly',this)">Monthly</button>
+        <button class="tbtn" onclick="switchFlow('2026',this)">2026 Only</button>
+      </div>
+      <div class="cw" style="height:220px"><canvas id="cLeadFlow"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Lead Status</div>
+      <div class="card-sub">All 382 leads</div>
+      <div class="cw" style="height:220px"><canvas id="cStatus"></canvas></div>
+    </div>
+  </div>
+
+  <div class="row row-11">
+    <div class="card">
+      <div class="card-title">Monthly Trend — All Time</div>
+      <div class="card-sub">Leads per month since inception</div>
+      <div class="cw" style="height:180px"><canvas id="cMonthly"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Leads by Pipeline</div>
+      <div class="card-sub">Distribution across all 5 pipelines</div>
+      <div class="cw" style="height:180px"><canvas id="cPipeline"></canvas></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── PIPELINE ── -->
+<div class="section" id="tab-pipeline">
+  <div class="pip-cards" id="pipCards"></div>
+
+  <div class="row row-21">
+    <div class="card">
+      <div class="card-title">Cottage Leads — Stage Funnel</div>
+      <div class="card-sub">Open leads by stage with conversion %</div>
+      <div id="funnelEl" class="funnel" style="margin-top:6px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Stage Conversion</div>
+      <div class="card-sub">Drop-off from each stage to the next</div>
+      <div class="cw" style="height:280px"><canvas id="cConv"></canvas></div>
+    </div>
+  </div>
+
+  <div class="row row-1">
+    <div class="card">
+      <div class="card-title">Pipeline Value by Stage</div>
+      <div class="card-sub">Assigned monetary value per stage (open + won)</div>
+      <div class="cw" style="height:210px"><canvas id="cStageVal"></canvas></div>
+    </div>
+  </div>
+
+  <div class="row row-1">
+    <div class="card">
+      <div class="card-title">🔍 Leads Worth Following Up</div>
+      <div class="card-sub">Ranked by engagement score, lead score &amp; CRM stage — updated from all tabs</div>
+      <div class="fl-table-wrap" id="followUpLeadsEl"><div style="color:var(--muted);font-size:12px;padding:8px 0">Loading…</div></div>
+    </div>
+  </div>
+
+  <div class="row row-1">
+    <div class="card">
+      <div class="card-title">📬 Outreach List — Leads from GHL CRM</div>
+      <div class="card-sub">Open leads identified as worth re-engaging · Pulled from 312 open opportunities · Mar 24 2026</div>
+      <div id="outreachEl"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── DEALS ── -->
+<div class="section" id="tab-deals">
+  <div class="kpi-grid">
+    <div class="kpi-card c-green">
+      <div class="kpi-label">Portfolio Revenue Target</div>
+      <div class="kpi-value">$1.54M</div>
+      <div class="kpi-sub">2026 · All 29 properties</div>
+    </div>
+    <div class="kpi-card c-teal">
+      <div class="kpi-label">Won Deals Target Value</div>
+      <div class="kpi-value">$1.13M</div>
+      <div class="kpi-sub">16 matched to projections</div>
+    </div>
+    <div class="kpi-card c-amber">
+      <div class="kpi-label">GHL Deal Value (Agreed)</div>
+      <div class="kpi-value">$1.24M</div>
+      <div class="kpi-sub">23 deals at close</div>
+    </div>
+    <div class="kpi-card c-blue">
+      <div class="kpi-label">Avg Days to Close</div>
+      <div class="kpi-value">86d</div>
+      <div class="kpi-sub">Excl. same-day closes</div>
+    </div>
+    <div class="kpi-card c-accent">
+      <div class="kpi-label">Largest Target</div>
+      <div class="kpi-value">$192K</div>
+      <div class="kpi-sub">Christine · 23 GlennBurney</div>
+    </div>
+    <div class="kpi-card c-red">
+      <div class="kpi-label">No Target Yet</div>
+      <div class="kpi-value">6</div>
+      <div class="kpi-sub">Newer clients — pending</div>
+    </div>
+    <div class="kpi-card c-blue">
+      <div class="kpi-label">Portfolio YTD Actual</div>
+      <div class="kpi-value">$432K</div>
+      <div class="kpi-sub">2026 host revenue · 22 props</div>
+    </div>
+    <div class="kpi-card" style="border-color:var(--teal)">
+      <div class="kpi-label">YTD vs Annual Target</div>
+      <div class="kpi-value" style="color:var(--teal)">28%</div>
+      <div class="kpi-sub">$432K of $1.54M · Mar 24</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Accepted Bookings 2026</div>
+      <div class="kpi-value">130</div>
+      <div class="kpi-sub">35 cancelled · 22 active props</div>
+    </div>
+  </div>
+
+  <div class="row row-11">
+    <div class="card">
+      <div class="card-title">GHL Agreed Value vs Revenue Target</div>
+      <div class="card-sub">Per deal — matched properties only (16 of 22)</div>
+      <div class="cw" style="height:230px"><canvas id="cDealCompare"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Days to Close — Distribution</div>
+      <div class="card-sub">Won deals grouped by time from lead to close</div>
+      <div class="cw" style="height:230px"><canvas id="cCloseTime"></canvas></div>
+    </div>
+  </div>
+
+  <div class="row row-1">
+    <div class="card">
+      <div class="card-title">Won Deals — All 22</div>
+      <div class="card-sub">GHL agreed value · 2026 revenue target · 2026 YTD actual from Hospitable API (Jan–Mar 24)</div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Lead / Property</th><th>GHL Agreed</th><th>2026 Target</th><th>2026 YTD Actual</th><th>vs Target</th><th>Days</th><th>Closed</th></tr></thead>
+          <tbody id="wonTbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CALL UPDATE ── -->
+<div class="section" id="tab-callupdate">
+  <div class="doc-hdr">
+    <h2>2026 HS Sales Team Call Update</h2>
+    <a href="https://docs.google.com/document/d/1oTxAOECYQszMnN9iUDiXjFK-yKVKUismZ045vajdPwo/edit" target="_blank" class="doc-link">Open in Google Docs →</a>
+  </div>
+
+  <!-- Next Actions Board -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="card-title">🎯 Next Actions — Priority Board</div>
+    <div class="card-sub">CRM-enriched · Sorted by urgency &amp; deal value · Updated Mar 23, 2026</div>
+    <div id="nextActionsEl"></div>
+  </div>
+
+  <!-- Weekly Call Log -->
+  <div class="card">
+    <div class="card-title">📋 Weekly Call Log</div>
+    <div class="card-sub">Sourced from Google Doc · Enriched with CRM stage &amp; value</div>
+    <div id="docEl"></div>
+  </div>
+</div>
+
+</div><!-- /container -->
+
+<!-- ── SETTINGS MODAL ── -->
+<div class="modal-bg" id="settingsModal" onclick="if(event.target===this)closeSettings()">
+  <div class="modal-box">
+    <h3>⚙ GHL CRM Sync</h3>
+    <p>Enter your GoHighLevel API token to automatically push sales updates as notes on each contact. The token is stored only in your browser's localStorage — never sent anywhere except GHL.</p>
+    <label class="modal-lbl">GHL API Token <span style="font-size:10px">(Settings → Integrations → Private Integration)</span></label>
+    <input class="modal-inp" id="ghlTokenInput" type="password" placeholder="eyJ0eXAiOiJKV1Qi...">
+    <label class="modal-lbl">Your Name <span style="font-size:10px">(used as note author)</span></label>
+    <input class="modal-inp" id="defaultAuthorInput" type="text" placeholder="e.g. Edwin">
+    <div class="modal-btns">
+      <button class="btn-secondary" onclick="clearGhlToken()">Clear Token</button>
+      <button class="btn-secondary" onclick="closeSettings()">Cancel</button>
+      <button class="btn-primary" onclick="saveSettings()">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// REAL DATA — GHL (382 opportunities) + Hospitable API
+// GHL last synced: Mar 23 2026 | Hospitable last synced: Mar 24 2026
+// ═══════════════════════════════════════════════════════
+const DATA = {
+  metrics: { totalLeads:382, thisWeekLeads:0, thisMonthLeads:14, totalOpen:311, totalWon:23, totalLost:14, totalAbandoned:34, totalPipelineValue:5154811, totalWonValue:1239100, closeRate:6.0, avgCloseDays:86,
+             activeProperties:22, totalBookings2026:130 },
+  // Hospitable API — 2026 YTD (as of Mar 24 2026)
+  hospitable: {
+    portfolioYTD:  432069,   // actual host revenue earned Jan–Mar 2026 (CAD)
+    acceptedRes:   130,      // accepted reservations in 2026
+    cancelledRes:  35,       // cancelled reservations in 2026
+    propertiesLive:22,       // properties with ≥1 booking in 2026
+    propertiesTotal:29,      // total managed properties on platform
+    fetchedAt: "2026-03-24"
+  },
+
+  weeklyLeads: [{"week":"2023-W44","count":1},{"week":"2023-W45","count":6},{"week":"2023-W46","count":12},{"week":"2023-W47","count":6},{"week":"2023-W48","count":2},{"week":"2023-W49","count":2},{"week":"2024-W01","count":11},{"week":"2024-W02","count":4},{"week":"2024-W03","count":1},{"week":"2024-W04","count":3},{"week":"2024-W05","count":1},{"week":"2024-W09","count":1},{"week":"2024-W10","count":3},{"week":"2024-W11","count":7},{"week":"2024-W12","count":9},{"week":"2024-W13","count":9},{"week":"2024-W14","count":1},{"week":"2024-W15","count":1},{"week":"2024-W16","count":4},{"week":"2024-W17","count":3},{"week":"2024-W18","count":3},{"week":"2024-W19","count":1},{"week":"2024-W20","count":1},{"week":"2024-W21","count":3},{"week":"2024-W22","count":1},{"week":"2024-W23","count":1},{"week":"2024-W24","count":2},{"week":"2024-W25","count":3},{"week":"2024-W26","count":1},{"week":"2024-W28","count":1},{"week":"2024-W35","count":1},{"week":"2024-W36","count":1},{"week":"2024-W37","count":1},{"week":"2024-W38","count":4},{"week":"2024-W39","count":3},{"week":"2024-W40","count":2},{"week":"2024-W41","count":1},{"week":"2024-W42","count":3},{"week":"2024-W43","count":2},{"week":"2024-W44","count":1},{"week":"2024-W45","count":3},{"week":"2024-W46","count":2},{"week":"2024-W48","count":2},{"week":"2024-W49","count":2},{"week":"2024-W50","count":1},{"week":"2025-W01","count":5},{"week":"2025-W02","count":3},{"week":"2025-W03","count":2},{"week":"2025-W04","count":3},{"week":"2025-W05","count":3},{"week":"2025-W06","count":4},{"week":"2025-W07","count":2},{"week":"2025-W08","count":2},{"week":"2025-W09","count":1},{"week":"2025-W10","count":3},{"week":"2025-W11","count":4},{"week":"2025-W12","count":2},{"week":"2025-W13","count":1},{"week":"2025-W14","count":4},{"week":"2025-W15","count":3},{"week":"2025-W16","count":2},{"week":"2025-W17","count":1},{"week":"2025-W20","count":1},{"week":"2025-W21","count":1},{"week":"2025-W22","count":2},{"week":"2025-W23","count":1},{"week":"2025-W24","count":2},{"week":"2025-W25","count":4},{"week":"2025-W26","count":3},{"week":"2025-W27","count":4},{"week":"2025-W28","count":3},{"week":"2025-W29","count":2},{"week":"2025-W30","count":3},{"week":"2025-W31","count":1},{"week":"2025-W32","count":3},{"week":"2025-W33","count":3},{"week":"2025-W34","count":2},{"week":"2025-W35","count":2},{"week":"2025-W36","count":2},{"week":"2025-W37","count":3},{"week":"2025-W38","count":2},{"week":"2025-W39","count":5},{"week":"2025-W40","count":5},{"week":"2025-W41","count":5},{"week":"2025-W42","count":5},{"week":"2025-W43","count":3},{"week":"2025-W44","count":6},{"week":"2025-W45","count":5},{"week":"2025-W46","count":5},{"week":"2025-W47","count":4},{"week":"2025-W48","count":4},{"week":"2025-W49","count":5},{"week":"2025-W50","count":4},{"week":"2025-W51","count":3},{"week":"2026-W02","count":4},{"week":"2026-W03","count":3},{"week":"2026-W04","count":13},{"week":"2026-W05","count":13},{"week":"2026-W06","count":6},{"week":"2026-W07","count":8},{"week":"2026-W08","count":7},{"week":"2026-W09","count":5},{"week":"2026-W10","count":6},{"week":"2026-W11","count":3},{"week":"2026-W12","count":4}],
+
+  monthlyLeads: [{"month":"2023-11","count":26},{"month":"2023-12","count":3},{"month":"2024-01","count":19},{"month":"2024-02","count":4},{"month":"2024-03","count":29},{"month":"2024-04","count":13},{"month":"2024-05","count":6},{"month":"2024-06","count":5},{"month":"2024-07","count":7},{"month":"2024-08","count":3},{"month":"2024-09","count":14},{"month":"2024-10","count":7},{"month":"2024-11","count":6},{"month":"2024-12","count":5},{"month":"2025-01","count":16},{"month":"2025-02","count":12},{"month":"2025-03","count":10},{"month":"2025-04","count":10},{"month":"2025-05","count":5},{"month":"2025-06","count":14},{"month":"2025-07","count":18},{"month":"2025-08","count":13},{"month":"2025-09","count":7},{"month":"2025-10","count":23},{"month":"2025-11","count":19},{"month":"2025-12","count":16},{"month":"2026-01","count":33},{"month":"2026-02","count":25},{"month":"2026-03","count":14}],
+
+  weekly2026: [{"week":"W02","count":4},{"week":"W03","count":3},{"week":"W04","count":13},{"week":"W05","count":13},{"week":"W06","count":6},{"week":"W07","count":8},{"week":"W08","count":7},{"week":"W09","count":5},{"week":"W10","count":6},{"week":"W11","count":3},{"week":"W12","count":4}],
+
+  funnel: [
+    {"name":"Inquired","count":10,"value":55000},
+    {"name":"Engaged Leads","count":100,"value":255000},
+    {"name":"Owners Report Sent","count":22,"value":1841000},
+    {"name":"Agreement Sent","count":2,"value":156000},
+    {"name":"Onboarding","count":2,"value":135000},
+    {"name":"Active Clients","count":5,"value":290000}
+  ],
+
+  stageValues: [
+    {"stage":"Owners Report Sent","count":24,"value":1891000},
+    {"stage":"Active Clients","count":25,"value":1369100},
+    {"stage":"Closed","count":112,"value":1151555},
+    {"stage":"Investor Clients","count":12,"value":545000},
+    {"stage":"Engaged Lead","count":13,"value":509440},
+    {"stage":"Engaged Leads","count":105,"value":255000},
+    {"stage":"Onboarding","count":3,"value":190000},
+    {"stage":"Hold","count":9,"value":168928},
+    {"stage":"Agreement Sent","count":2,"value":156000},
+    {"stage":"Inquired","count":13,"value":55000},
+    {"stage":"Referred","count":5,"value":48000},
+    {"stage":"Proposal Sent","count":2,"value":4888}
+  ],
+
+  // value = GHL deal value (agreed at time of close)
+  // target = 2026 annual revenue projection from HS Financial Dashboard (revenue_targets.csv)
+  // target=0 means property not yet in financial dashboard (newer clients)
+  // actualYTD = 2026 host revenue Jan–Mar from Hospitable API (CAD, as of Mar 24 2026)
+  wonDeals: [
+    {"name":"253 Crescent Bay-Vibish Gurumurthi","value":40000,"target":28100,  "actualYTD":3698,  "days":7,  "closedAt":"2026-02-04","pipeline":"Cottage Leads"},
+    {"name":"157 Menominee-Francisco",           "value":55000,"target":56400,  "actualYTD":0,     "days":45, "closedAt":"2026-02-02","pipeline":"Cottage Leads"},
+    {"name":"5441-10 Sideroad-Kirill",           "value":1500, "target":0,      "actualYTD":0,     "days":273,"closedAt":"2025-08-19","pipeline":"Cottage Leads"},
+    {"name":"Lauren-1169 Leonard Lake",          "value":54000,"target":65747,  "actualYTD":15084, "days":124,"closedAt":"2025-08-19","pipeline":"Cottage Leads"},
+    {"name":"Lori-1034 Centre Ave",              "value":65000,"target":85836,  "actualYTD":27054, "days":118,"closedAt":"2025-08-19","pipeline":"Cottage Leads"},
+    {"name":"2487 Falkenburg-Hannah Ulrich",     "value":50000,"target":0,      "actualYTD":0,     "days":89, "closedAt":"2025-08-19","pipeline":"Cottage Leads"},
+    {"name":"111 Wychwood-Warren Bell",          "value":5000, "target":37805,  "actualYTD":25201, "days":45, "closedAt":"2025-08-19","pipeline":"Cottage Leads"},
+    {"name":"Samantha-298 Highfield",            "value":65000,"target":56963,  "actualYTD":31973, "days":175,"closedAt":"2025-03-10","pipeline":"Cottage Leads"},
+    {"name":"Joanne-1053 Sanderson",             "value":75000,"target":77189,  "actualYTD":29334, "days":0,  "closedAt":"2025-02-27","pipeline":"Cottage Leads"},
+    {"name":"Michael-3B Barnsdale",              "value":65000,"target":54667,  "actualYTD":10955, "days":51, "closedAt":"2025-02-27","pipeline":"Cottage Leads"},
+    {"name":"Gobind-6893 Johnsonwagon",          "value":75000,"target":68908,  "actualYTD":9121,  "days":73, "closedAt":"2024-11-29","pipeline":"Cottage Leads"},
+    {"name":"Ira-10A Mckechnie",                 "value":10000,"target":0,      "actualYTD":0,     "days":13, "closedAt":"2024-09-10","pipeline":"Cottage Leads"},
+    {"name":"Loren-1356 Peninsula",              "value":20000,"target":37752,  "actualYTD":0,     "days":13, "closedAt":"2024-07-18","pipeline":"Cottage Leads"},
+    {"name":"Joanne-3014 Muskoka",               "value":85000,"target":123184, "actualYTD":33228, "days":9,  "closedAt":"2024-06-24","pipeline":"Cottage Leads"},
+    {"name":"Maribel Funtanilla",                "value":55000,"target":0,      "actualYTD":0,     "days":27, "closedAt":"2024-06-03","pipeline":"Cottage Leads"},
+    {"name":"Shona-1081 Bastedo",                "value":35000,"target":25938,  "actualYTD":9441,  "days":186,"closedAt":"2024-06-03","pipeline":"Cottage Leads"},
+    {"name":"Mahendra-130 Combe",                "value":58600,"target":61078,  "actualYTD":0,     "days":126,"closedAt":"2024-04-03","pipeline":"Cottage Leads"},
+    {"name":"Christine-23GlennBurney",           "value":155000,"target":191606,"actualYTD":40463, "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
+    {"name":"Jack-2108 S Orr",                   "value":30000,"target":0,      "actualYTD":0,     "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
+    {"name":"Akash-119 Minnetonka",              "value":105000,"target":115940,"actualYTD":49801, "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
+    {"name":"Danielle-619 Morningview",          "value":50000,"target":72326,  "actualYTD":30993, "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
+    {"name":"Daisy-9 Bexley",                    "value":35000,"target":0,      "actualYTD":0,     "days":0,  "closedAt":"2023-11-29","pipeline":"Cottage Leads"},
+    {"name":"Cathy Lau",                          "value":50000,"target":0,      "actualYTD":0,     "days":254,"closedAt":"2026-03-24","pipeline":"Cottage Leads"}
+  ],
+  portfolioTarget: 1535865, // total 2026 annual target across all 29 properties (revenue_targets.csv)
+
+  statusDist: [
+    {"status":"Open","count":312,"color":"#3b82f6"},
+    {"status":"Won","count":22,"color":"#22c55e"},
+    {"status":"Abandoned","count":34,"color":"#f59e0b"},
+    {"status":"Lost","count":14,"color":"#ef4444"}
+  ],
+
+  pipelines: [
+    {"name":"Cottage Leads","count":342,"stages":9,"color":"#6c63ff"},
+    {"name":"Host Program","count":15,"stages":3,"color":"#3b82f6"},
+    {"name":"Toronto Leads","count":11,"stages":5,"color":"#14b8a6"},
+    {"name":"Mid-Long Term Guest","count":9,"stages":4,"color":"#f59e0b"},
+    {"name":"Referred","count":5,"stages":3,"color":"#22c55e"}
+  ]
+};
+
+const CALL_UPDATE = {
+  weeks: [
+    { title: "March 17, 2026", prospects: [
+      { name:"Karen Wookey", detail:"Pending insurance", tag:"pending" },
+      { name:"Monty", detail:"4 Georgian Pine Dr — contract sent, pending review", tag:"pending" },
+      { name:"David Reeves", detail:"1583 Acton Island Lot 2" },
+      { name:"Corrine", detail:"Otter Lake — end of month walk through to close", tag:"closing" },
+      { name:"Sameer Ahmed", detail:"Milton 11 bed + 1 in Oakville, 13380 Guelph Line — send revenue report" },
+      { name:"Alex", detail:"1188 S Morrison Lake — EC to call to finalize contracts", tag:"pending" },
+      { name:"Tim Trian", detail:"4090 Appleby Line, Burlington" },
+      { name:"Amit Joshi", detail:"Northern Lights Community — left VM March 19" },
+      { name:"Ewa", detail:"Left VM March 19" }
+    ]},
+    { title: "March 12, 2026", prospects: [
+      { name:"Karen Wookey", detail:"Mulmar — appointment at 4:30pm March 3" },
+      { name:"Corrine", detail:"Otter Lake — end of month walk through to close", tag:"closing" },
+      { name:"Alex", detail:"1188 S Morrison Lake — EC to call to finalize contracts" },
+      { name:"Tim Trian", detail:"4090 Appleby Line, Burlington" },
+      { name:"Diana Cuttell", detail:"Muskoka — booked 3.12 at 4:30pm" },
+      { name:"James MacDonald", detail:"Pilot in Port Severn — 583 Sweets Portage — awaiting the wife" },
+      { name:"Monty", detail:"4 Georgian Pine Dr — Saturday walkthrough" },
+      { name:"Mauyad", detail:"1001 Heintzman Gate — MG to call" },
+      { name:"Anna", detail:"20 Hawkin Point Rd, Georgian Bay" },
+      { name:"Jackie", detail:"40k/mo", tag:"backlist" },
+      { name:"Gord Fawcet", detail:"Marisa to follow up for other address" },
+      { name:"Ewa", detail:"EC F/U follow up" },
+      { name:"Mona", detail:"EC F/U — 1009 Pine Lake 3 Rd, Baysville, ON" },
+      { name:"Connie Fang", detail:"EC F/U again" },
+      { name:"Amit Joshi", detail:"Northern Lights Community" }
+    ]},
+    { title: "March 3, 2026", prospects: [
+      { name:"Karen Wookey", detail:"Mulmar appointment at 4:30pm March 3" },
+      { name:"Jackie", detail:"40k/mo", tag:"backlist" },
+      { name:"Alex", detail:"1188 S Morrison Lake" },
+      { name:"Corrine", detail:"Otter Lake" },
+      { name:"Domenico", detail:"EC to Send PLFS" },
+      { name:"Gord Fawcet", detail:"Marisa to follow up for other address" },
+      { name:"Angelo C", detail:"cottagesincanada.com/36688", tag:"backlist" },
+      { name:"Ewa", detail:"EC F/U follow up" },
+      { name:"Mona", detail:"EC F/U — 1009 Pine Lake 3 Rd, Baysville, ON" },
+      { name:"Connie Fang", detail:"EC F/U again" },
+      { name:"Monty", detail:"4 Georgian Pine Dr — EC F/U" },
+      { name:"Amit Joshi", detail:"Northern Lights Community" },
+      { name:"Mark Lorenco", detail:"ON", tag:"backlist" },
+      { name:"Joshua Shang", detail:"88 Causeway", tag:"backlist" },
+      { name:"James MacDonald", detail:"583 Sweets Portage — appt March 4 at 11:30am" },
+      { name:"Andrew Hardwicke", detail:"May Follow Up" }
+    ]},
+    { title: "Feb 24, 2026", prospects: [
+      { name:"Domenico", detail:"Georgian Bay — booked appt Feb 27 at 1pm", tag:"closing" },
+      { name:"Gord Fawcet", detail:"Cottage in Williamsburg + another in Durham area" },
+      { name:"Angelo C", detail:"Leonard Lake 2bd/1ba", tag:"backlist" },
+      { name:"Taru", detail:"Already on Airbnb, wants optimization — agreed to speak Feb 25 at 4:30pm" },
+      { name:"Parvindar", detail:"14836 Duffy Lane, Caledon — booked call Feb 26 at 1pm" },
+      { name:"Sasan", detail:"Called Feb 25 — resend contract", tag:"pending" },
+      { name:"Ewa", detail:"Cancelled meeting — follow up", tag:"pending" },
+      { name:"Corrine", detail:"Closing call Wednesday", tag:"closing" },
+      { name:"Mona", detail:"1009 Pine Lake 3 Rd, Baysville" },
+      { name:"Mark Lorenco", detail:"In progress, following up" },
+      { name:"Amit Joshi", detail:"Northern Lights Community — homeseekervacation.com" },
+      { name:"Connie Fang", detail:"F/U again" },
+      { name:"James MacDonald", detail:"583 Sweets Portage — appt March 4 at 11:30am" }
+    ]},
+    { title: "Feb 17, 2026", prospects: [
+      { name:"Sasan", detail:"Call back F/U (Edwin) — resent contract", tag:"pending" },
+      { name:"Alok", detail:"Wants to stay put this year, follow up May/June" },
+      { name:"Mark Lorenco", detail:"Call back F/U (Marisa) — messaged Feb 19" },
+      { name:"Corinne", detail:"Appointment booked next Friday", tag:"closing" },
+      { name:"Monty", detail:"(416) 562-6070 — missed appt, non-responsive, Ali to F/U" },
+      { name:"Joshua", detail:"88 Causeway Rd — licensing complicated, F/U mid season" },
+      { name:"Connie Fang", detail:"Realtor — sent Loom video" },
+      { name:"Ewa", detail:"Sent revenue report — follow up" }
+    ]},
+    { title: "Feb 10, 2026", prospects: [
+      { name:"Gordon Fawcet", detail:"Scheduled appt Feb 23rd at 11am" },
+      { name:"Lindsay Clements", detail:"Cottage in Balsam Lakes — 1-time service" },
+      { name:"Alok Paliwal", detail:"2 cottages in Emsdale / Doe Lake — sent owner report" },
+      { name:"Sasan", detail:"Wants marketing-only service", tag:"pending" },
+      { name:"Amir Epstein", detail:"Revenue report + Friday follow-up call" },
+      { name:"Ewa Jarzak", detail:"Appointment today, TBC" }
+    ]},
+    { title: "Feb 3, 2026", prospects: [
+      { name:"Mark Lorenco", detail:"Stewart Lake, MacTier — 2bd 1ba + bunkie, $40-50K last year", tag:"pending" },
+      { name:"Vibish", detail:"Condo Huntsville 3bd 3.5ba mid-term — contract sign back", tag:"closing" },
+      { name:"Alok Paliwal", detail:"Bay Lake and Doe Lake 6 bed each" },
+      { name:"Lindsay", detail:"1-time optimization service" },
+      { name:"Gord Fawcet", detail:"9077 Wellington Rd — Horse Barn type experience, large land" }
+    ]}
+  ]
+};
+
+// ═══════════════════ HELPERS ═══════════════════
+const C = ['#6c63ff','#3b82f6','#14b8a6','#f59e0b','#22c55e','#ef4444','#ec4899','#8b5cf6'];
+const FC = ['#3b82f6','#6c63ff','#8b5cf6','#14b8a6','#22c55e','#f59e0b'];
+const fmt = v => v >= 1e6 ? `$${(v/1e6).toFixed(2)}M` : v >= 1e3 ? `$${Math.round(v/1e3)}K` : `$${v}`;
+const fmtFull = v => '$' + v.toLocaleString();
+
+// ═══════════════════ NAV ═══════════════════
+const tabInited = { overview: true, pipeline: false, deals: false, callupdate: false };
+function showTab(id, btn) {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + id).classList.add('active');
+  btn.classList.add('active');
+  // Lazy-init charts for tabs that were hidden at DOMContentLoaded
+  if (!tabInited[id]) {
+    tabInited[id] = true;
+    setTimeout(() => initTabCharts(id), 20);
+  }
+}
+
+// ═══════════════════ CHARTS ═══════════════════
+let chartLeadFlow;
+
+function chartDefaults() {
+  Chart.defaults.color = '#8892a4';
+  Chart.defaults.borderColor = '#2a2f45';
+  Chart.defaults.font.family = "system-ui, -apple-system, sans-serif";
+  Chart.defaults.font.size = 11;
+}
+
+function mkBar(id, labels, data, opts={}) {
+  return new Chart(document.getElementById(id), {
+    type: 'bar',
+    data: { labels, datasets: [{ data, backgroundColor: opts.colors || C[0], borderRadius: 4, borderWidth: 0 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => opts.fmtY ? ` ${fmt(ctx.raw)}` : ` ${ctx.raw}` } } },
+      scales: {
+        x: { grid: { color: '#1e2235' }, ticks: { maxRotation: opts.rotX ?? 0, font: { size: 10 } } },
+        y: { grid: { color: '#1e2235' }, beginAtZero: true, ticks: { callback: opts.fmtY ? fmt : undefined } }
+      },
+      indexAxis: opts.horizontal ? 'y' : 'x',
+      ...opts.extra
+    }
+  });
+}
+
+function buildFlowData(mode) {
+  if (mode === '2026') {
+    return { labels: DATA.weekly2026.map(d => d.week), data: DATA.weekly2026.map(d => d.count) };
+  }
+  if (mode === 'monthly') {
+    return { labels: DATA.monthlyLeads.map(d => d.month.slice(2)), data: DATA.monthlyLeads.map(d => d.count) };
+  }
+  // weekly — last 30 weeks
+  const src = DATA.weeklyLeads.slice(-30);
+  return { labels: src.map(d => d.week.replace(/^\d{4}-/, '')), data: src.map(d => d.count) };
+}
+
+function switchFlow(mode, btn) {
+  document.querySelectorAll('.tbtn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const { labels, data } = buildFlowData(mode);
+  chartLeadFlow.data.labels = labels;
+  chartLeadFlow.data.datasets[0].data = data;
+  chartLeadFlow.update();
+}
+
+function initCharts() {
+  chartDefaults();
+
+  // Lead flow
+  const fd = buildFlowData('weekly');
+  chartLeadFlow = new Chart(document.getElementById('cLeadFlow'), {
+    type: 'bar',
+    data: { labels: fd.labels, datasets: [{ data: fd.data, backgroundColor: '#6c63ff', borderRadius: 3, borderWidth: 0 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#1e2235' }, ticks: { maxRotation: 45, font: { size: 9 } } },
+        y: { grid: { color: '#1e2235' }, beginAtZero: true, ticks: { stepSize: 2 } }
+      }
+    }
+  });
+
+  // Status doughnut
+  new Chart(document.getElementById('cStatus'), {
+    type: 'doughnut',
+    data: {
+      labels: DATA.statusDist.map(d => d.status),
+      datasets: [{ data: DATA.statusDist.map(d => d.count), backgroundColor: DATA.statusDist.map(d => d.color), borderWidth: 0, hoverOffset: 6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '62%',
+      plugins: { legend: { position: 'right', labels: { boxWidth: 12, padding: 10, font: { size: 11 } } } }
+    }
+  });
+
+  // Monthly all-time line
+  new Chart(document.getElementById('cMonthly'), {
+    type: 'line',
+    data: {
+      labels: DATA.monthlyLeads.map(d => d.month.slice(2)),
+      datasets: [{ data: DATA.monthlyLeads.map(d => d.count), borderColor: '#6c63ff', backgroundColor: 'rgba(108,99,255,.12)', fill: true, tension: 0.4, pointRadius: 3, pointBackgroundColor: '#6c63ff', borderWidth: 2 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: '#1e2235' }, ticks: { maxRotation: 45, font: { size: 9 } } },
+        y: { grid: { color: '#1e2235' }, beginAtZero: true }
+      }
+    }
+  });
+
+  // Pipeline bar horizontal
+  mkBar('cPipeline', DATA.pipelines.map(p => p.name), DATA.pipelines.map(p => p.count), {
+    colors: DATA.pipelines.map(p => p.color), horizontal: true
+  });
+
+  // Conversion horizontal bar
+  mkBar('cConv', DATA.funnel.map(f => f.name), DATA.funnel.map(f => f.count), {
+    colors: FC, horizontal: true,
+    extra: { plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => {
+      const max = DATA.funnel[0].count;
+      return ` ${ctx.raw} leads (${Math.round(ctx.raw/max*100)}% of top)`;
+    }}}}}
+  });
+
+  // Stage values bar
+  const sv = DATA.stageValues.filter(s => s.value > 0);
+  new Chart(document.getElementById('cStageVal'), {
+    type: 'bar',
+    data: { labels: sv.map(s => s.stage), datasets: [{ data: sv.map(s => s.value), backgroundColor: C, borderRadius: 4, borderWidth: 0 }] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${fmtFull(ctx.raw)}` } } },
+      scales: {
+        x: { grid: { color: '#1e2235' }, ticks: { maxRotation: 35, font: { size: 9 } } },
+        y: { grid: { color: '#1e2235' }, beginAtZero: true, ticks: { callback: fmt } }
+      }
+    }
+  });
+
+}
+
+// ═══════════════════ LAZY TAB CHARTS ═══════════════════
+function initTabCharts(id) {
+  if (id === 'deals') {
+    // Close time distribution
+    const buckets = {'Same day':0,'1–14d':0,'15–30d':0,'31–60d':0,'61–120d':0,'120d+':0};
+    DATA.wonDeals.forEach(d => {
+      if (d.days === 0) buckets['Same day']++;
+      else if (d.days <= 14) buckets['1–14d']++;
+      else if (d.days <= 30) buckets['15–30d']++;
+      else if (d.days <= 60) buckets['31–60d']++;
+      else if (d.days <= 120) buckets['61–120d']++;
+      else buckets['120d+']++;
+    });
+    mkBar('cCloseTime', Object.keys(buckets), Object.values(buckets), { colors: '#6c63ff' });
+
+    // GHL value vs Revenue Target comparison
+    const matched = DATA.wonDeals.filter(d => d.target > 0).sort((a,b) => b.target - a.target);
+    new Chart(document.getElementById('cDealCompare'), {
+      type: 'bar',
+      data: {
+        labels: matched.map(d => d.name.replace(/^[^-]+-/, '').split('-')[0].trim().slice(0,16)),
+        datasets: [
+          { label: 'GHL Agreed Value',   data: matched.map(d => d.value),  backgroundColor: '#f59e0b', borderRadius: 3, borderWidth: 0 },
+          { label: '2026 Revenue Target', data: matched.map(d => d.target), backgroundColor: '#22c55e', borderRadius: 3, borderWidth: 0 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 10, font: { size: 10 } } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${fmtFull(ctx.raw)}` } }
+        },
+        scales: {
+          x: { grid: { color: '#1e2235' }, ticks: { maxRotation: 40, font: { size: 9 } } },
+          y: { grid: { color: '#1e2235' }, beginAtZero: true, ticks: { callback: fmt } }
+        }
+      }
+    });
+  }
+
+  if (id === 'pipeline') {
+    renderFollowUpLeads();
+    renderOutreachList();
+  }
+}
+
+// ═══════════════════ FUNNEL ═══════════════════
+function renderFunnel() {
+  const max = Math.max(...DATA.funnel.map(f => f.count));
+  document.getElementById('funnelEl').innerHTML = DATA.funnel.map((f, i) => {
+    const pct = max > 0 ? Math.round(f.count / max * 100) : 0;
+    const prev = i > 0 ? DATA.funnel[i-1].count : f.count;
+    const conv = i > 0 && prev > 0 ? Math.round(f.count/prev*100) : 100;
+    return `<div class="f-row">
+      <div class="f-label">${f.name}</div>
+      <div class="f-bar-bg"><div class="f-bar" style="width:${pct}%;background:${FC[i]}">${i > 0 ? conv+'%' : ''}</div></div>
+      <div class="f-count" style="color:${FC[i]}">${f.count}</div>
+      <div class="f-val">${f.value > 0 ? fmt(f.value) : ''}</div>
+    </div>`;
+  }).join('');
+}
+
+// ═══════════════════ PIPELINE CARDS ═══════════════════
+function renderPipCards() {
+  document.getElementById('pipCards').innerHTML = DATA.pipelines.map(p => `
+    <div class="pip-card">
+      <div class="pip-name">${p.name}</div>
+      <div class="pip-count" style="color:${p.color}">${p.count}</div>
+      <div class="pip-stages">${p.stages} stages</div>
+    </div>`).join('');
+}
+
+// ═══════════════════ WON TABLE ═══════════════════
+function renderWonTable() {
+  document.getElementById('wonTbody').innerHTML = DATA.wonDeals.map((d, i) => {
+    const dt = new Date(d.closedAt).toLocaleDateString('en-CA', { month:'short', day:'numeric', year:'numeric' });
+    const variance = d.target > 0 ? d.target - d.value : null;
+    const varHtml = variance === null
+      ? '<span style="color:var(--muted);font-size:10px">No target yet</span>'
+      : variance >= 0
+        ? `<span style="color:var(--green);font-weight:700">+${fmtFull(variance)}</span>`
+        : `<span style="color:var(--red);font-weight:700">-${fmtFull(Math.abs(variance))}</span>`;
+
+    // YTD actual from Hospitable API
+    const ytdHtml = d.actualYTD > 0
+      ? `<span style="color:var(--teal);font-weight:700">${fmtFull(d.actualYTD)}</span>`
+      : d.target > 0
+        ? '<span style="color:var(--muted);font-size:10px">Season ahead</span>'
+        : '<span style="color:var(--muted);font-size:10px">—</span>';
+
+    // YTD vs annual target pace
+    const vsTargetHtml = d.target > 0 && d.actualYTD > 0
+      ? (() => {
+          const pct = Math.round(d.actualYTD / d.target * 100);
+          const color = pct >= 30 ? 'var(--green)' : pct >= 15 ? 'var(--amber)' : 'var(--red)';
+          return `<span style="color:${color};font-weight:700">${pct}%</span>`;
+        })()
+      : '<span style="color:var(--muted);font-size:10px">—</span>';
+
+    return `<tr>
+      <td style="color:var(--muted)">${i+1}</td>
+      <td><strong>${d.name}</strong></td>
+      <td style="color:var(--amber);font-weight:600">${d.value > 0 ? fmtFull(d.value) : '—'}</td>
+      <td style="color:var(--green);font-weight:700">${d.target > 0 ? fmtFull(d.target) : '<span style="color:var(--muted);font-size:10px">Pending</span>'}</td>
+      <td>${ytdHtml}</td>
+      <td>${vsTargetHtml}</td>
+      <td>${d.days === 0 ? '<span style="color:var(--muted)">Same day</span>' : `<span style="color:var(--blue)">${d.days}d</span>`}</td>
+      <td style="color:var(--muted)">${dt}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════ CALL UPDATE ═══════════════════
+function renderCallUpdate() {
+  document.getElementById('docEl').innerHTML = CALL_UPDATE.weeks.map(w => `
+    <div class="week-block">
+      <div class="week-hdr">${w.title}</div>
+      <ul class="prospect-list">${w.prospects.map((p, i) => {
+        const tag = p.tag === 'backlist' ? '<span class="tag tag-b">BACKLIST</span>'
+                  : p.tag === 'pending'  ? '<span class="tag tag-p">PENDING</span>'
+                  : p.tag === 'closing'  ? '<span class="tag tag-c">CLOSING</span>' : '';
+        // Look up CRM data by first name match
+        const crm = Object.values(CRM_PROSPECTS.byName).find(c => {
+          const pFirst = p.name.toLowerCase().split(' ')[0];
+          const cFirst = c.fullName.toLowerCase().split(' ')[0];
+          // Handle Corrine/Corinne spelling variant
+          const normalize = s => s.replace(/corin+e/i, 'corinne');
+          return normalize(pFirst) === normalize(cFirst) ||
+            c.fullName.toLowerCase().includes(p.name.toLowerCase()) ||
+            p.name.toLowerCase().includes(cFirst);
+        });
+        const crmBadges = crm ? `<div class="p-crm">
+          ${crm.value > 0 ? `<span class="p-crm-badge p-crm-val">$${(crm.value/1000).toFixed(0)}K</span>` : ''}
+          <span class="p-crm-badge p-crm-stage">${crm.stage}</span>
+          <span class="p-crm-badge p-crm-${crm.priority === 'fire' ? 'val' : crm.priority === 'hot' ? 'new' : 'stage'}">${crm.priority === 'fire' ? '🔥 Close now' : crm.priority === 'hot' ? '⚡ High priority' : '📅 Follow up'}</span>
+        </div>` : '';
+        return `<li class="p-item">
+          <span class="p-num">${i+1}.</span>
+          <div>
+            <div class="p-name">${p.name}${tag}</div>
+            ${p.detail ? `<div class="p-detail">${p.detail}</div>` : ''}
+            ${crmBadges}
+          </div>
+        </li>`;
+      }).join('')}</ul>
+    </div>`).join('');
+}
+
+// ═══════════════════ CRM PROSPECTS (live GHL data) ═══════════════════
+const CRM_PROSPECTS = {
+  // priority: "fire" | "hot" | "warm" | "nurture"
+  // contactId: GHL contact ID for note sync (null = not in CRM / not found)
+  byName: {
+    "Sasan": {
+      fullName: "Sasan Yazdi", property: "Airbnb/CottagesinCanada — $80K/yr · 6yrs hosting", value: 100000,
+      stage: "Owners Report Sent", pipeline: "Host Program", daysSinceCreated: 439, source: "CSV Import",
+      contactId: null, leadScore: 88,
+      priority: "fire",
+      action: "<strong>🔥 Resend contract TODAY</strong> then call immediately to confirm receipt. He said he never got it (Feb 25). He was \"ready to go\" in Feb — don't lose momentum. Call after 5pm.",
+      note: "Long history of communication gaps. Ice dam damage concern was raised in 2025 but Jan 2026 notes say he's ready. Farid (friend) is the liaison."
+    },
+    "Tim Trian": {
+      fullName: "Tim Trian", property: "4090 Appleby Line, Burlington — pickleball, sports court, sleeps 12", value: 150000,
+      stage: "Owners Report Sent", pipeline: "Cottage Leads", daysSinceCreated: 18, source: "Facebook Ad",
+      contactId: "zkBMDFMYqmY6IAfk2ghs", leadScore: 82,
+      priority: "fire",
+      action: "<strong>🔥 Book follow-up call this week.</strong> Only on VRBO — pitch multi-platform (add Airbnb). Anchor on $150K value. Address his cleaning/ops pain point directly. Had call Mar 5, follow-up Mar 12.",
+      note: "~$80K/yr currently with 7–8 bookings. ADR $2–3K/night. Not there in winter. Massive upside with Airbnb + World Cup demand coming."
+    },
+    "Alok Paliwal": {
+      fullName: "Alok Paliwal", property: "2 cottages — Bay Lake & Doe Lake, Muskoka. Earns $90K/yr", value: 185000,
+      stage: "Owners Report Sent", pipeline: "Host Program", daysSinceCreated: 53, source: "Manual",
+      contactId: "cNfyGeYuLE2BrV2woWv0", leadScore: 79,
+      priority: "fire",
+      action: "<strong>🔥 Schedule in-person walkthrough now.</strong> He wants off-season help — summer is already booked. Focus pitch on shoulder season optimization. He earns $7K/wk gross. Two properties = double the win.",
+      note: "Builder with his own construction & cleaning crew. Handles his own guest comms. Self-manages on muskokalakesrentals.com. Wants help with bookings only."
+    },
+    "Ewa": {
+      fullName: "Ewa Jarzak", property: "On Airbnb + CottagesinCanada", value: 109000,
+      stage: "Owners Report Sent", pipeline: "Cottage Leads", daysSinceCreated: 41, source: "Manual",
+      contactId: "JkalaySbqgFmQSUMKdWl", leadScore: 74,
+      priority: "hot",
+      action: "<strong>⚡ Try a different touch.</strong> VMs not working. Send a personalized Loom video walking through her specific listing performance vs. what we could achieve. Then text.",
+      note: "Cancelled one meeting. Has active Airbnb listing. No email on file — phone only (+1 416-727-1786)."
+    },
+    "Amit Joshi": {
+      fullName: "Amit Joshi", property: "Lake of Bays — 3-bed, sleeps 8–10, games room. $45K net/yr", value: 84000,
+      stage: "Owners Report Sent", pipeline: "Cottage Leads", daysSinceCreated: 845, source: "Referral",
+      contactId: "FmnDa7GrpovBwh3gayMx", leadScore: 95,
+      priority: "hot",
+      action: "<strong>⚡ Try calling at a different time.</strong> Left VM Mar 19. This lead has been open 2+ years. Send a 1-line text: \"Amit — quick question about your Lake of Bays property, got 2 mins?\"",
+      note: "Has existing PM team on revenue-share. We offered custom revenue report. Lead score: 95/100 — high intent signal."
+    },
+    "Gord Fawcett": {
+      fullName: "Gord Fawcett", property: "4 properties: Barrie (Lake Simcoe), Durham (300 acres), Hillsburgh, McCullough Lake (Owen Sound)", value: 0,
+      stage: "Inquired", pipeline: "Cottage Leads", daysSinceCreated: 33, source: "Facebook",
+      contactId: "r0EslK0zOW9MPZRhMFiw", leadScore: 61,
+      priority: "hot",
+      action: "<strong>⚡ Follow up for property addresses.</strong> He promised to send details. Start with the Barrie house (near Lake Simcoe — most rental-ready). A 4-property investor is a major account.",
+      note: "Investor with 4 properties. Barn in Hillsburgh could be event/wedding venue. Actively looking to monetize. Lead score: 61."
+    },
+    "James MacDonald": {
+      fullName: "James MacDonald", property: "583 Sweet Portage, Port Severn — 4-season, Gloucester Pool", value: 48000,
+      stage: "Owners Report Sent", pipeline: "Cottage Leads", daysSinceCreated: 100, source: "Facebook Ad",
+      contactId: "tpNdPp4UlxH3AzvXZqR2", leadScore: 62,
+      priority: "hot",
+      action: "<strong>⚡ He's back from Florida — call now.</strong> Offer the pricing concession: 20% full service + $100/mo tech fee for 1 year. Needs wife buy-in, so suggest a 3-way intro call.",
+      note: "Price-sensitive. July–Aug already booked ($450–500/night). Uses Beyond Pricing. Wants off-season bookings. Lead score: 62."
+    },
+    "Karen Wookey": {
+      fullName: "Karen Wookey", property: "606461 River Rd, Mulmur — 3-bed, barrel sauna, swim pond, chef's kitchen", value: 65000,
+      stage: "Engaged Leads", pipeline: "Cottage Leads", daysSinceCreated: 20, source: "Chat Widget (Organic)",
+      contactId: "LgY7JGaaZ99MAwyCuKju", leadScore: 70,
+      priority: "warm",
+      action: "<strong>📅 Follow up after Mar 31.</strong> She's away last week of March. Photos being done by her photographer when weather improves. Wants 30-day rentals only (primary residence). Touch base Apr 1.",
+      note: "Walked the property. Interested in monthly rentals to travel. Has barrel sauna, swim pond, mountain bikes. All-season potential."
+    },
+    "Sameer Ahmed": {
+      fullName: "Sameer Ahmed", property: "Campbelleville — 7,000 sq ft + 4-bed in Oakville (2 properties)", value: 0,
+      stage: "Inquired", pipeline: "Cottage Leads", daysSinceCreated: 6, source: "Manual",
+      contactId: "k4XqBcy5HCpqOgtCNF1H", leadScore: 68,
+      priority: "warm",
+      action: "<strong>📅 Follow up this week.</strong> He's doing a financial analysis. A 7,000 sq ft property in Campbelleville + 4-bed in Oakville = massive dual-property deal. Send a tailored revenue projection for each.",
+      note: "Bought during COVID, considering renting vs. selling. Sent contract + owner guide. Revenue comps already shared."
+    },
+    "David Reeves": {
+      fullName: "David Reeves", property: "1583 Acton Island Lot 2 — seasonal cottage", value: 0,
+      stage: "Inquired", pipeline: "Cottage Leads", daysSinceCreated: 6, source: "Zapier/OpenPhone",
+      contactId: "pGIySJWlGrH9nb0gUg8E", leadScore: 58,
+      priority: "warm",
+      action: "<strong>📅 Give until ~Mar 26, then call.</strong> Sent pricing, contract &amp; owner guide. Followed up by text Mar 23 — they're reviewing. Call to walk through any questions.",
+      note: "Wants a few weeks in summer + off-season. Has reviewed materials as of Mar 23. Active engagement — timing is good."
+    },
+    "Domenico": {
+      fullName: "Domenico Mastronardi", property: "52 Brooke Ave, Tiny Township — basement needs reno before listing", value: 0,
+      stage: "Inquired", pipeline: "Cottage Leads", daysSinceCreated: 34, source: "Facebook Ad",
+      contactId: "GIuQUSdj0BRmE889BbDG", leadScore: 55,
+      priority: "warm",
+      action: "<strong>📅 Send STR regs + revenue report, then book a call.</strong> He's confused about Tiny Township regulations. Promised to send this info. Do it this week — it unlocks the next conversation.",
+      note: "Never listed on STR before. Past noise complaints from neighbours. Needs hand-holding on regulations. Solid lead per team notes."
+    },
+    "Corrine": {
+      fullName: "Corinne MacMillan", property: "Otter Lake, 20 min south of Parry Sound — 5-bed/2-bath, lakefront, winterized", value: 65000,
+      stage: "Owners Report Sent", pipeline: "Cottage Leads", daysSinceCreated: 42, source: "Facebook Ad",
+      contactId: "SCGaHEQBiEJbEBF2TdRP", leadScore: 91,
+      priority: "fire",
+      action: "<strong>🔥 End-of-month walkthrough — close the contract.</strong> Video walkthrough with Marisa completed Feb 28. End-of-month closing call confirmed. Have contract ready to sign. She wants full-season management — winterized property with year-round potential.",
+      note: "5-bed/2-bath lakefront on Otter Lake. Sauna planned for summer. 3 kayaks, paddleboards, BBQ, smoker. Currently Airbnb-only, summer-focused (60–70% occupancy). Wants year-round optimization. Noted as solid closing lead by Ali Abdali. $65K value."
+    },
+    "Monty": {
+      fullName: "Monty", property: "4 Georgian Pine Dr", value: 0,
+      stage: "Not in CRM", pipeline: "—", daysSinceCreated: null, source: "—",
+      contactId: null, leadScore: 45,
+      priority: "warm",
+      action: "<strong>📅 Contract sent, pending review.</strong> Saturday walkthrough done. Ali to follow up. Check if CRM record exists under a different name.",
+      note: "Contract sent. Previously non-responsive by phone. Walkthrough completed."
+    }
+  }
+};
+
+// ═══════════════════ OVERVIEW SALES FOCUS ═══════════════════
+function renderOverviewSalesFocus() {
+  const prospects = Object.values(CRM_PROSPECTS.byName);
+  const fire  = prospects.filter(p => p.priority === 'fire');
+  const hot   = prospects.filter(p => p.priority === 'hot');
+  const total = prospects.reduce((s, p) => s + p.value, 0);
+
+  // Engagement counts from call update
+  const engMap = {};
+  CALL_UPDATE.weeks.forEach(w => {
+    w.prospects.forEach(p => {
+      const key = p.name.toLowerCase().split(' ')[0];
+      engMap[key] = (engMap[key] || 0) + 1;
+    });
+  });
+  const getEng = name => {
+    const first = name.toLowerCase().split(' ')[0].replace(/corin+e/i,'corinne');
+    return engMap[first] || engMap[name.toLowerCase()] || 0;
+  };
+
+  // Won deals health
+  const wonMatched  = DATA.wonDeals.filter(d => d.target > 0);
+  const totalTarget = wonMatched.reduce((s, d) => s + d.target, 0);
+  const totalWon    = wonMatched.reduce((s, d) => s + d.value,  0);
+  const wonPct      = totalTarget > 0 ? Math.round(totalWon / totalTarget * 100) : 0;
+
+  // Recent team updates count
+  const allUpds = getAllUpdates ? getAllUpdates() : {};
+  const updCount = Object.values(allUpds).reduce((s, arr) => s + arr.length, 0);
+
+  document.getElementById('salesFocusEl').innerHTML = `
+    <div class="sf-grid">
+      <div class="sf-card">
+        <div class="sf-card-hdr">🔥 Close This Week</div>
+        <div class="sf-card-val" style="color:var(--red)">${fire.length} prospects</div>
+        <div class="sf-card-sub">$${(fire.reduce((s,p)=>s+p.value,0)/1000).toFixed(0)}K at stake</div>
+      </div>
+      <div class="sf-card">
+        <div class="sf-card-hdr">⚡ High Priority</div>
+        <div class="sf-card-val" style="color:var(--amber)">${hot.length} prospects</div>
+        <div class="sf-card-sub">$${(hot.reduce((s,p)=>s+p.value,0)/1000).toFixed(0)}K pipeline</div>
+      </div>
+      <div class="sf-card">
+        <div class="sf-card-hdr">💰 Total Pipeline at Stake</div>
+        <div class="sf-card-val" style="color:var(--green)">$${(total/1000).toFixed(0)}K+</div>
+        <div class="sf-card-sub">${prospects.length} active prospects</div>
+      </div>
+      <div class="sf-card">
+        <div class="sf-card-hdr">📊 Won Value vs Target</div>
+        <div class="sf-card-val" style="color:${wonPct >= 80 ? 'var(--green)' : wonPct >= 60 ? 'var(--amber)' : 'var(--red)'}">${wonPct}%</div>
+        <div class="sf-card-sub">${fmtFull(totalWon)} of ${fmtFull(totalTarget)}</div>
+      </div>
+      <div class="sf-card">
+        <div class="sf-card-hdr">📝 Team Updates Logged</div>
+        <div class="sf-card-val" style="color:var(--accent)">${updCount}</div>
+        <div class="sf-card-sub">Across all prospects</div>
+      </div>
+      <div class="sf-card">
+        <div class="sf-card-hdr">🏆 Portfolio YTD vs Target</div>
+        <div class="sf-card-val" style="color:var(--teal)">28%</div>
+        <div class="sf-card-sub">$432K of $1.54M · ${DATA.hospitable.propertiesLive}/${DATA.hospitable.propertiesTotal} props active</div>
+      </div>
+    </div>
+
+    <div class="sf-divider"></div>
+    <div class="sf-section-lbl">🔥 Closing This Week — Take Action Now</div>
+    <ul class="sf-list">
+      ${fire.map(p => {
+        const eng = getEng(p.fullName);
+        const stripHtml = s => s.replace(/<[^>]+>/g,'');
+        const shortAction = stripHtml(p.action).replace(/^[🔥⚡📅]+\s*/,'').slice(0,70) + '…';
+        return `<li class="sf-item">
+          <span class="sf-item-name">${p.fullName}</span>
+          <span class="sf-item-detail">${shortAction}</span>
+          ${p.value > 0 ? `<span class="sf-item-badge sfb-fire">$${(p.value/1000).toFixed(0)}K</span>` : ''}
+        </li>`;
+      }).join('')}
+    </ul>
+
+    <div class="sf-divider"></div>
+    <div class="sf-section-lbl">⚡ High Priority — Follow Up This Week</div>
+    <ul class="sf-list">
+      ${hot.map(p => {
+        const stripHtml = s => s.replace(/<[^>]+>/g,'');
+        const shortAction = stripHtml(p.action).replace(/^[🔥⚡📅]+\s*/,'').slice(0,70) + '…';
+        return `<li class="sf-item">
+          <span class="sf-item-name">${p.fullName}</span>
+          <span class="sf-item-detail">${shortAction}</span>
+          ${p.value > 0 ? `<span class="sf-item-badge sfb-hot">$${(p.value/1000).toFixed(0)}K</span>` : '<span class="sf-item-badge sfb-warm">TBD</span>'}
+        </li>`;
+      }).join('')}
+    </ul>`;
+}
+
+// ═══════════════════ PIPELINE FOLLOW-UP LEADS ═══════════════════
+function renderFollowUpLeads() {
+  const TOTAL_WEEKS = CALL_UPDATE.weeks.length;
+
+  // Build engagement map: first-name → weeks appeared
+  const engMap = {};
+  CALL_UPDATE.weeks.forEach(w => {
+    const seen = new Set();
+    w.prospects.forEach(p => {
+      const key = p.name.toLowerCase().replace(/corin+e/i,'corinne').split(' ')[0];
+      if (!seen.has(key)) { seen.add(key); engMap[key] = (engMap[key] || 0) + 1; }
+    });
+  });
+
+  const getEng = fullName => {
+    const first = fullName.toLowerCase().replace(/corin+e/i,'corinne').split(' ')[0];
+    return engMap[first] || 0;
+  };
+
+  // Score each prospect: lead score (0-100) × 0.4 + engagement (0-7 norm) × 0.35 + priority bonus × 0.25
+  const PRIORITY_BONUS = { fire: 100, hot: 65, warm: 35 };
+  const rows = Object.values(CRM_PROSPECTS.byName).map(p => {
+    const eng      = getEng(p.fullName);
+    const ls       = p.leadScore || 50;
+    const engNorm  = Math.min(eng / TOTAL_WEEKS, 1) * 100;
+    const pb       = PRIORITY_BONUS[p.priority] || 0;
+    const score    = Math.round(ls * 0.4 + engNorm * 0.35 + pb * 0.25);
+    return { ...p, eng, score };
+  }).sort((a, b) => b.score - a.score);
+
+  const stripHtml = s => s.replace(/<[^>]+>/g,'');
+  const scoreClass = s => s >= 75 ? 'fl-score-high' : s >= 55 ? 'fl-score-mid' : 'fl-score-low';
+  const priBadge = p => p === 'fire'
+    ? '<span class="st sfb-fire">🔥 Close now</span>'
+    : p === 'hot'
+      ? '<span class="st sfb-hot">⚡ High priority</span>'
+      : '<span class="st sfb-warm">📅 Follow up</span>';
+
+  document.getElementById('followUpLeadsEl').innerHTML = `
+    <table class="fl-table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Score</th>
+          <th>Prospect</th>
+          <th>Stage / Value</th>
+          <th>Engagement</th>
+          <th>Priority</th>
+          <th>Next Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${rows.map((p, i) => `<tr>
+          <td style="color:var(--muted)">${i+1}</td>
+          <td><span class="fl-score ${scoreClass(p.score)}">${p.score}</span></td>
+          <td>
+            <div style="font-weight:700">${p.fullName}</div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">${p.property.slice(0,45)}${p.property.length>45?'…':''}</div>
+          </td>
+          <td>
+            <div style="color:var(--muted);font-size:11px">${p.stage}</div>
+            <div style="font-weight:700;color:${p.value > 0 ? 'var(--green)' : 'var(--muted)'};">${p.value > 0 ? '$'+Math.round(p.value/1000)+'K' : '—'}</div>
+          </td>
+          <td>
+            <div style="font-size:12px;font-weight:700;color:${p.eng >= 4 ? 'var(--accent)' : 'var(--muted)'}">${p.eng} / ${TOTAL_WEEKS} wks</div>
+            <div class="fl-eng">
+              ${Array.from({length:TOTAL_WEEKS},(_,j) => `<div class="fl-eng-dot${j < p.eng ? ' on' : ''}"></div>`).join('')}
+            </div>
+          </td>
+          <td>${priBadge(p.priority)}</td>
+          <td class="fl-action-text">${stripHtml(p.action).replace(/^[🔥⚡📅]+\s*/,'').slice(0,90)}…</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+// ═══════════════════ NEXT ACTIONS ═══════════════════
+const slugId = s => s.replace(/\s+/g,'-').replace(/[^a-zA-Z0-9-]/g,'').toLowerCase();
+
+function renderNextActions() {
+  const all = Object.entries(CRM_PROSPECTS.byName);
+  const groups = [
+    { key: "fire", label: "Close This Week",         color: "#ef4444", emoji: "🔥" },
+    { key: "hot",  label: "High Priority Follow-Up", color: "#f59e0b", emoji: "⚡" },
+    { key: "warm", label: "This Week — Keep Moving", color: "#3b82f6", emoji: "📅" }
+  ];
+  const totalValue = all.reduce((s,[,p]) => s + p.value, 0);
+  const savedAuthor = localStorage.getItem('hs_default_author') || '';
+
+  document.getElementById('nextActionsEl').innerHTML = `
+    <div style="display:flex;gap:20px;margin-bottom:16px;flex-wrap:wrap">
+      <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 16px">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Active Prospects</div>
+        <div style="font-size:20px;font-weight:700;color:var(--accent)">${all.length}</div>
+      </div>
+      <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 16px">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Pipeline Value at Stake</div>
+        <div style="font-size:20px;font-weight:700;color:var(--green)">$${(totalValue/1000).toFixed(0)}K+</div>
+      </div>
+      <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 16px">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Closing Now</div>
+        <div style="font-size:20px;font-weight:700;color:var(--red)">${all.filter(([,p])=>p.priority==='fire').length}</div>
+      </div>
+    </div>
+    ${groups.map(g => {
+      const prospects = all.filter(([,p]) => p.priority === g.key);
+      if (!prospects.length) return '';
+      return `<div class="na-priority">
+        <div class="na-priority-hdr">
+          <div class="na-dot" style="background:${g.color}"></div>
+          <span style="color:${g.color}">${g.emoji} ${g.label}</span>
+          <span style="color:var(--muted);font-weight:400;font-size:11px">(${prospects.length})</span>
+        </div>
+        <div class="na-cards">
+          ${prospects.map(([key, p]) => {
+            const sk = slugId(key);
+            const cid = p.contactId || '';
+            const syncLabel = cid ? 'Save + GHL →' : 'Save';
+            return `<div class="na-card p-${g.key}" id="nacard-${sk}">
+              <div class="na-name">${p.fullName}</div>
+              <div class="na-prop">${p.property}</div>
+              <div class="na-badges">
+                ${p.value > 0 ? `<span class="na-badge na-val">$${(p.value/1000).toFixed(0)}K value</span>` : ''}
+                <span class="na-badge na-stage">${p.stage}</span>
+                ${p.daysSinceCreated ? `<span class="na-badge na-age">${p.daysSinceCreated}d in pipeline</span>` : ''}
+                ${p.source !== '—' ? `<span class="na-badge na-src">${p.source}</span>` : ''}
+              </div>
+              <div class="na-action">${p.action}</div>
+              ${p.note ? `<div class="na-note">${p.note}</div>` : ''}
+              <div class="na-updates">
+                <div class="na-upd-hdr">
+                  <span class="na-upd-lbl">📝 Team Updates <span id="updcount-${sk}" style="color:var(--accent);font-weight:700"></span></span>
+                  <button class="na-upd-toggle" onclick="toggleUpdLog('${sk}')">Show / Add</button>
+                </div>
+                <div class="na-upd-log" id="updlog-${sk}"></div>
+                <div class="na-upd-form">
+                  <textarea id="updtext-${sk}" placeholder="Log a call, note next steps, or drop context for the team…"></textarea>
+                  <div class="na-upd-row">
+                    <input class="na-upd-author" id="updauthor-${sk}" placeholder="Your name" value="${savedAuthor}">
+                    <button class="na-save-btn" id="savebtn-${sk}" onclick="saveUpdate('${sk}','${cid}')">${syncLabel}</button>
+                  </div>
+                  <div class="na-sync-status" id="syncstt-${sk}"></div>
+                </div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }).join('')}`;
+
+  // Refresh update counts for all cards
+  all.forEach(([key]) => refreshUpdCount(slugId(key)));
+}
+
+// ═══════════════════ UPDATE LOG SYSTEM ═══════════════════
+const UPD_KEY = 'hs_sales_updates';
+function getAllUpdates() { try { return JSON.parse(localStorage.getItem(UPD_KEY) || '{}'); } catch(e) { return {}; } }
+function setAllUpdates(d) { localStorage.setItem(UPD_KEY, JSON.stringify(d)); }
+
+function refreshUpdCount(sk) {
+  const n = (getAllUpdates()[sk] || []).length;
+  const el = document.getElementById('updcount-' + sk);
+  if (el) el.textContent = n > 0 ? `(${n})` : '';
+}
+
+function renderUpdLog(sk) {
+  const entries = getAllUpdates()[sk] || [];
+  const el = document.getElementById('updlog-' + sk);
+  if (!el) return;
+  el.innerHTML = entries.length === 0
+    ? '<div style="font-size:10px;color:var(--muted);font-style:italic;padding:3px 0 6px">No updates yet — be the first to log one.</div>'
+    : entries.slice().reverse().map(e => `
+        <div class="na-upd-entry">
+          <div class="na-upd-meta">${e.date} · <strong>${e.author}</strong>${e.synced ? ' · <span style="color:var(--green)">✓ Synced to GHL</span>' : ''}</div>
+          <div class="na-upd-text">${e.text.replace(/\n/g, '<br>')}</div>
+        </div>`).join('');
+  refreshUpdCount(sk);
+}
+
+function toggleUpdLog(sk) {
+  const el = document.getElementById('updlog-' + sk);
+  if (!el) return;
+  el.classList.toggle('open');
+  if (el.classList.contains('open')) renderUpdLog(sk);
+}
+
+async function saveUpdate(sk, contactId) {
+  const textEl  = document.getElementById('updtext-'   + sk);
+  const authEl  = document.getElementById('updauthor-' + sk);
+  const sttEl   = document.getElementById('syncstt-'   + sk);
+  const btn     = document.getElementById('savebtn-'   + sk);
+  const text    = textEl ? textEl.value.trim() : '';
+  const author  = (authEl ? authEl.value.trim() : '') || 'Team';
+
+  if (!text) {
+    if (textEl) { textEl.style.borderColor = 'var(--red)'; setTimeout(() => textEl.style.borderColor = '', 1500); }
+    return;
+  }
+
+  // Persist default author
+  localStorage.setItem('hs_default_author', author);
+
+  const now  = new Date();
+  const date = now.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' });
+  const time = now.toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' });
+  const ts   = `${date} ${time}`;
+
+  // Save to localStorage
+  const all = getAllUpdates();
+  if (!all[sk]) all[sk] = [];
+  const entry = { id: String(Date.now()), date: ts, text, author, synced: false };
+  all[sk].push(entry);
+  setAllUpdates(all);
+  if (textEl) textEl.value = '';
+
+  // Show the log with new entry
+  const logEl = document.getElementById('updlog-' + sk);
+  if (logEl) logEl.classList.add('open');
+  renderUpdLog(sk);
+
+  // GHL sync
+  const token = localStorage.getItem('hs_ghl_token');
+  if (token && contactId) {
+    if (btn) btn.disabled = true;
+    if (sttEl) sttEl.innerHTML = '<span class="sync-ing">⏳ Syncing to GHL…</span>';
+    try {
+      const res = await fetch(`https://services.leadconnectorhq.com/contacts/${contactId}/notes`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Version': '2021-07-28',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ body: `[Sales Update · ${author} · ${ts}]\n\n${text}` })
+      });
+      if (res.ok) {
+        const upd = getAllUpdates();
+        const idx = (upd[sk] || []).findIndex(e => e.id === entry.id);
+        if (idx >= 0) { upd[sk][idx].synced = true; setAllUpdates(upd); }
+        renderUpdLog(sk);
+        if (sttEl) sttEl.innerHTML = '<span class="sync-ok">✓ Saved &amp; synced to GHL CRM</span>';
+      } else {
+        if (sttEl) sttEl.innerHTML = `<span class="sync-err">✗ GHL error (${res.status}) — saved locally</span>`;
+      }
+    } catch(e) {
+      if (sttEl) sttEl.innerHTML = '<span class="sync-err">✗ Network error — saved locally</span>';
+    } finally {
+      if (btn) btn.disabled = false;
+      setTimeout(() => { if (sttEl) sttEl.innerHTML = ''; }, 4500);
+    }
+  } else if (!token) {
+    if (sttEl) sttEl.innerHTML = `<span class="sync-ing">💾 Saved locally · <a href="#" onclick="openSettings();return false" style="color:var(--accent);text-decoration:none">Set up GHL sync →</a></span>`;
+    setTimeout(() => { if (sttEl) sttEl.innerHTML = ''; }, 6000);
+  } else {
+    if (sttEl) sttEl.innerHTML = '<span class="sync-ing">💾 Saved locally (contact not linked to CRM ID)</span>';
+    setTimeout(() => { if (sttEl) sttEl.innerHTML = ''; }, 3500);
+  }
+}
+
+// ═══════════════════ SETTINGS ═══════════════════
+function openSettings() {
+  document.getElementById('settingsModal').classList.add('open');
+  document.getElementById('ghlTokenInput').value       = localStorage.getItem('hs_ghl_token')       || '';
+  document.getElementById('defaultAuthorInput').value  = localStorage.getItem('hs_default_author')  || '';
+}
+function closeSettings() { document.getElementById('settingsModal').classList.remove('open'); }
+function clearGhlToken() {
+  localStorage.removeItem('hs_ghl_token');
+  document.getElementById('ghlTokenInput').value = '';
+  updateSyncDot();
+}
+function saveSettings() {
+  const token  = document.getElementById('ghlTokenInput').value.trim();
+  const author = document.getElementById('defaultAuthorInput').value.trim();
+  if (token)  localStorage.setItem('hs_ghl_token',      token);  else localStorage.removeItem('hs_ghl_token');
+  if (author) localStorage.setItem('hs_default_author', author); else localStorage.removeItem('hs_default_author');
+  updateSyncDot();
+  closeSettings();
+}
+function updateSyncDot() {
+  const dot = document.getElementById('syncDot');
+  if (dot) dot.className = 'sync-dot' + (localStorage.getItem('hs_ghl_token') ? ' on' : '');
+}
+
+// ═══════════════════ OUTREACH LIST DATA (from GHL — 312 open opps, Mar 24 2026) ═══════════════════
+const OUTREACH = {
+  // group: "hot" = stale high-value ≥$50K | "warm" = recent engaged | "sleeper" = >180d gone quiet
+  leads: [
+    // ── Re-engage: Stale high-value ──
+    { name:"Jasmine Choy",        value:300000, daysSince:215, notes:7,  group:"hot",     source:"Facebook",
+      note:"Had active conversation — 'Friday 10am' scheduled. 7 notes. Highest value open lead in CRM.",
+      angle:"It's been 7 months — check in with a quick 'still thinking about it?' text. $300K deal." },
+    { name:"Amarina Singh",       value:98000,  daysSince:245, notes:2,  group:"hot",     source:"Survey",
+      note:"Replied 'Yes anytime' then went cold 8 months ago. Has value assigned.",
+      angle:"She said yes to a call. Send a 1-line follow-up: 'Still open to a quick chat?'" },
+    { name:"Ihor Dotsenko",       value:120000, daysSince:110, notes:0,  group:"hot",     source:"Facebook",
+      note:"$120K Facebook lead, 110d stale, no notes. Recent enough to re-activate.",
+      angle:"Send intro + owner revenue report. No contact made yet — clean slate outreach." },
+    { name:"Yuliya Dotsenko",     value:120000, daysSince:110, notes:1,  group:"hot",     source:"Facebook",
+      note:"Same household as Ihor — 'npu' note (not picked up). $120K FB lead.",
+      angle:"Try a different channel — text instead of call. Mention a specific comp property nearby." },
+    { name:"Meera Sharma",        value:110000, daysSince:256, notes:6,  group:"hot",     source:"CottagesinCanada",
+      note:"Active Airbnb listing. 6 notes of engagement. 8+ months stale.",
+      angle:"Send updated revenue projection for her specific Airbnb listing. Re-anchor on what she's leaving on the table." },
+    { name:"Afrah Arif",          value:80000,  daysSince:73,  notes:1,  group:"hot",     source:"Facebook",
+      note:"Has Airbnb listing (CA$1M+ reviews). 73d stale — still warm.",
+      angle:"Reference her listing directly. 'We noticed your Airbnb — here's what we'd project for your property.'" },
+    { name:"Anwar",               value:75000,  daysSince:175, notes:11, group:"hot",     source:"Google Search",
+      note:"11 notes — deeply engaged, asked detailed questions about swim advisories, rentability.",
+      angle:"Most engaged lead in this group. Re-open with answers to his lingering questions. He was close." },
+    { name:"Gainan Yang",         value:100000, daysSince:257, notes:3,  group:"sleeper", source:"Airbnb Cohost Network",
+      note:"'They already got it sorted out' — self-managing for 9 months now. Worth a re-check.",
+      angle:"'How's the season going? Owners who self-manage often come back after a tough summer.' Low-pressure touch." },
+    { name:"Moshin",              value:100000, daysSince:356, notes:4,  group:"sleeper", source:"Referral",
+      note:"Said he'd call back — that was almost a year ago. 4 notes.",
+      angle:"Referral lead with $100K value. Brief text re-intro. 'Still thinking about STR management?'" },
+    { name:"Stan Prasad",         value:70000,  daysSince:292, notes:7,  group:"sleeper", source:"Facebook",
+      note:"'Call back next week Monday' — said 10 months ago. 7 notes of history.",
+      angle:"Long engagement history. Send a seasonal re-engagement: 'Heading into peak season — wanted to reconnect.'" },
+    { name:"501 North Bay-Pierre",value:65000,  daysSince:118, notes:6,  group:"hot",     source:"Facebook",
+      note:"6 notes, last follow-up was about dock renos. Status unclear.",
+      angle:"Ask about reno status. 'If the dock is done, now is the right time to list for summer.'" },
+    { name:"Loren-56 Fennings",   value:70000,  daysSince:389, notes:27, group:"sleeper", source:"Cleaner Referral",
+      note:"27 notes — most engaged inactive lead in CRM. 'Tomorrow works for me' was the last response.",
+      angle:"Highest note count of any lead. Was actively engaged. Re-open: 'We've had a few openings — wanted to loop back.'" },
+    // ── Recent warm inbounds (≤45d, has engagement notes) ──
+    { name:"Ina Bartlett",        value:0,      daysSince:33,  notes:4,  group:"warm",    source:"Rev Report Form",
+      note:"4 notes. Property details shared: plows driveway, needs cleaning/restock, goes every 2 weeks.",
+      angle:"Detailed inbound — she's clearly interested. Send a tailored owners report + schedule a call." },
+    { name:"Suzette Kerner",      value:0,      daysSince:16,  notes:3,  group:"warm",    source:"Facebook",
+      note:"Actively asking pricing questions: 'And 5% on every booking revenue and a monthly fee?' — warm.",
+      angle:"She's price-comparing. Close the loop on fees — offer a 30-min call to walk through exactly what she'd earn." },
+    { name:"Dave Scherbinsky",    value:0,      daysSince:34,  notes:3,  group:"warm",    source:"Cottage Qualification",
+      note:"Came through qualification form. 3 notes. Actively engaged.",
+      angle:"Qualification form lead = high intent. Send the owner report and follow up within 48h." },
+    { name:"Sameer Ahmed",        value:0,      daysSince:6,   notes:1,  group:"warm",    source:"Manual",
+      note:"7,000 sq ft Campbelleville + 4-bed Oakville. Doing financial analysis.",
+      angle:"Two properties = major account. Send dual revenue projections — one per property — this week." },
+    { name:"Timothy Mackinnon",   value:0,      daysSince:12,  notes:1,  group:"warm",    source:"Facebook",
+      note:"PEI property, earns $12–16K/yr, uses it himself. Short season.",
+      angle:"Match his current earnings with what a managed approach would return. Address personal-use weeks upfront." },
+    { name:"Sam Saha",            value:0,      daysSince:27,  notes:1,  group:"warm",    source:"Airbnb Management Canada",
+      note:"Moving from GTA to Owen Sound. Georgian Bay / Severn Bridge area.",
+      angle:"Local move = motivated to monetize. Pitch with comp properties from the Owen Sound area." },
+    // ── Sleepers with strong signals ──
+    { name:"Grant Watson",        value:48000,  daysSince:245, notes:1,  group:"sleeper", source:"Referral",
+      note:"'Needs to convince the wife.' 3bd/2ba sleeps 8. Looking to rent next year.",
+      angle:"It's been 8 months — 'next year' is now. Re-approach with: 'Ready to get started for this season?'" },
+  ]
+};
+
+// ═══════════════════ RENDER OUTREACH LIST ═══════════════════
+function renderOutreachList() {
+  const groups = [
+    { key:'hot',     label:'🔥 Re-Engage — High Value Stale Leads',  color:'var(--red)',    badge:'sfb-fire',  desc:'≥$50K · Went cold 30–500d ago · Worth a direct touch now' },
+    { key:'warm',    label:'⚡ Warm Inbounds — Active Last 45 Days',  color:'var(--amber)',  badge:'sfb-hot',   desc:'Recently engaged · Came in hot · Needs a close' },
+    { key:'sleeper', label:'💤 Sleepers — Long Gone, High Potential', color:'var(--blue)',   badge:'sfb-warm',  desc:'>180d stale · Had engagement signals · Seasonal re-activation' },
+  ];
+
+  const html = groups.map(g => {
+    const leads = OUTREACH.leads.filter(l => l.group === g.key);
+    if (!leads.length) return '';
+    return `
+      <div style="margin-bottom:22px">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;padding:8px 12px;background:rgba(255,255,255,.03);border-radius:6px;border-left:3px solid ${g.color}">
+          <span style="font-size:13px;font-weight:700;color:${g.color}">${g.label}</span>
+          <span style="font-size:11px;color:var(--muted)">${g.desc}</span>
+          <span style="margin-left:auto;font-size:11px;font-weight:700;color:${g.color}">${leads.length} leads</span>
+        </div>
+        <div style="overflow-x:auto">
+        <table class="fl-table">
+          <thead><tr>
+            <th>Prospect</th><th>Value</th><th>Days Stale</th><th>Notes</th><th>Source</th><th>Context</th><th>Outreach Angle</th>
+          </tr></thead>
+          <tbody>
+            ${leads.map(l => `<tr>
+              <td><strong>${l.name}</strong></td>
+              <td style="color:${l.value>0?'var(--green)':'var(--muted)'};font-weight:700">${l.value>0?'$'+Math.round(l.value/1000)+'K':'—'}</td>
+              <td><span style="color:${l.daysSince>180?'var(--red)':l.daysSince>60?'var(--amber)':'var(--blue)'};font-weight:600">${l.daysSince}d</span></td>
+              <td style="color:var(--accent)">${l.notes}</td>
+              <td style="color:var(--muted);font-size:11px">${l.source}</td>
+              <td style="font-size:11px;color:var(--muted);max-width:220px">${l.note}</td>
+              <td style="font-size:11px;color:var(--text);max-width:240px"><strong>${l.angle}</strong></td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+        </div>
+      </div>`;
+  }).join('');
+
+  const totalValue = OUTREACH.leads.reduce((s,l) => s+l.value, 0);
+  const withValue  = OUTREACH.leads.filter(l => l.value > 0).length;
+  document.getElementById('outreachEl').innerHTML = `
+    <div style="display:flex;gap:12px;margin-bottom:16px;flex-wrap:wrap">
+      <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:9px 14px">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Leads Identified</div>
+        <div style="font-size:20px;font-weight:700;color:var(--accent)">${OUTREACH.leads.length}</div>
+      </div>
+      <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:9px 14px">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Value at Stake</div>
+        <div style="font-size:20px;font-weight:700;color:var(--green)">$${(totalValue/1000).toFixed(0)}K</div>
+      </div>
+      <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:9px 14px">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">With GHL Value</div>
+        <div style="font-size:20px;font-weight:700;color:var(--amber)">${withValue} leads</div>
+      </div>
+      <div style="background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:9px 14px">
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Top Opportunity</div>
+        <div style="font-size:20px;font-weight:700;color:var(--red)">$300K</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">Jasmine Choy · 215d stale</div>
+      </div>
+    </div>
+    ${html}`;
+}
+
+// ═══════════════════ INIT ═══════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  renderFunnel();
+  renderPipCards();
+  renderWonTable();
+  renderNextActions();
+  renderCallUpdate();
+  initCharts();
+  updateSyncDot();
+  renderOverviewSalesFocus();
+});
+</script>
+</body>
+</html>
