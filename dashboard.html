@@ -2211,8 +2211,9 @@ function tgtFilterClick(btn) {
 }
 
 // ── Weekly Tracker ────────────────────────────────────────────────────────────
-if (!window._wkExpanded) window._wkExpanded = {};  // persist expand state across re-renders
-if (window._wkSortCol === undefined) window._wkSortCol = null; // active column-click sort date
+if (!window._wkExpanded)  window._wkExpanded  = {};
+if (window._wkSortCol === undefined) window._wkSortCol = null;
+if (!window._wkInitYear)  window._wkInitYear  = null; // tracks which year defaults were set
 
 function renderWeekly(data, yearFilter) {
   const year     = yearFilter === 'all' ? String(new Date().getFullYear()) : yearFilter;
@@ -2279,6 +2280,19 @@ function renderWeekly(data, yearFilter) {
              Object.keys(revByPropDate[p.id]||{}).some(d=>d.startsWith(moStr));
     });
   });
+
+  // ── Default expand state (current + next 2 future, reset when year changes) ─
+  if (window._wkInitYear !== year) {
+    window._wkInitYear = year;
+    window._wkExpanded = {};
+    const curMo = parseInt(todayStr.substring(5, 7));
+    let futCount = 0;
+    activeMos.forEach(mo => {
+      const t = moType(mo);
+      if (t === 'current') { window._wkExpanded[mo] = true; }
+      else if (t === 'future' && futCount < 2) { window._wkExpanded[mo] = true; futCount++; }
+    });
+  }
 
   // ── Controls ───────────────────────────────────────────────────────────────
   const wkPropSel = document.getElementById('wkPropFilter');
@@ -2374,31 +2388,34 @@ function renderWeekly(data, yearFilter) {
     return { html:`<span style="color:${color};font-weight:700">${gap>=0?'+':''}${fmtShort(gap)}</span>`, color };
   }
 
-  // ── Build headers ──────────────────────────────────────────────────────────
+  // ── Build headers — all months clickable to expand/collapse ──────────────
+  const toggleFn = (mo) => `window._wkExpanded[${mo}]=!window._wkExpanded[${mo}];renderWeekly(rawData,'${year}')`;
+  const thBase   = `cursor:pointer;user-select:none;white-space:nowrap;font-weight:700;text-align:center;`;
+
   let h1 = `<tr style="background:#0f1117">
     <th style="${SL};background:#0f1117;min-width:150px;text-align:left;${P}"></th>`;
   let h2 = `<tr style="background:#141628">
     <th style="${SL};background:#141628;text-align:left;${P};font-size:0.68rem;color:#6b7280">PROPERTY</th>`;
 
   activeMos.forEach(mo => {
-    const type    = moType(mo);
-    const moStr   = `${year}-${String(mo).padStart(2,'0')}`;
-    const isCurr  = type === 'current';
-    const isPast  = type === 'past';
-    const border  = `border-left:3px solid ${isCurr?'#6366f1':'#3d4168'};`;
-    const isExp   = window._wkExpanded[mo];   // only relevant for past months
-    const label   = `${MO[mo-1]} ${year}`;
+    const type   = moType(mo);
+    const isCurr = type === 'current';
+    const isPast = type === 'past';
+    const isFutureMo = type === 'future';
+    const isExp  = !!window._wkExpanded[mo];
+    const border = `border-left:3px solid ${isCurr ? '#6366f1' : '#3d4168'};`;
+    const label  = `${MO[mo-1]} ${year}`;
+    const icon   = isExp ? '▾' : '▸';
+    const wks    = weekDates(mo);
 
     if (isPast) {
-      const cols  = isExp ? 3 : 1;
-      const icon  = isExp ? '▾' : '▸';
-      // compute portfolio gap pct for collapsed badge
+      // Collapsed: 1 col (gap badge in header) | Expanded: 3 cols (Target | Actual | Gap)
       const portActual = portCum(mo, monthEnd(mo));
       const portTgt    = portTarget(mo);
-      const gapPct     = portTgt>0 ? ((portActual/portTgt-1)*100).toFixed(0) : null;
-      const gapColor   = gapPct!==null ? (parseFloat(gapPct)>=0?'#34d399':'#f87171') : '#6b7280';
-      const badge      = gapPct!==null ? ` <span style="color:${gapColor};font-size:0.62rem">(${parseFloat(gapPct)>=0?'+':''}${gapPct}%)</span>` : '';
-      h1 += `<th colspan="${cols}" onclick="window._wkExpanded[${mo}]=!window._wkExpanded[${mo}];renderWeekly(rawData,'${year}')" style="background:#0f1117;text-align:center;${border}${Ps};color:#a78bfa;font-size:0.73rem;font-weight:700;cursor:pointer;user-select:none;white-space:nowrap">${icon} ${label}${isExp?'':badge}</th>`;
+      const gapPct     = portTgt > 0 ? ((portActual / portTgt - 1) * 100).toFixed(0) : null;
+      const gapColor   = gapPct !== null ? (parseFloat(gapPct) >= 0 ? '#34d399' : '#f87171') : '#6b7280';
+      const collBadge  = gapPct !== null ? ` <span style="color:${gapColor};font-size:0.6rem">(${parseFloat(gapPct) >= 0 ? '+' : ''}${gapPct}%)</span>` : '';
+      h1 += `<th colspan="${isExp ? 3 : 1}" onclick="${toggleFn(mo)}" style="background:#0f1117;${border}${Ps};${thBase}color:#a78bfa;font-size:0.72rem;">${icon} ${label}${isExp ? '' : collBadge}</th>`;
       if (isExp) {
         h2 += `<th class="num" style="background:#141628;${border}${Ps};color:#facc15;font-size:0.63rem;white-space:nowrap">Target</th>`;
         h2 += `<th class="num" style="background:#141628;${Ps};font-size:0.63rem;white-space:nowrap;color:#6b7280">Actual</th>`;
@@ -2406,28 +2423,47 @@ function renderWeekly(data, yearFilter) {
       } else {
         h2 += `<th class="num" style="background:#141628;${border}${Ps};font-size:0.63rem;white-space:nowrap;color:#6b7280">Gap</th>`;
       }
+
     } else if (isCurr) {
-      const wks = weekDates(mo);
-      h1 += `<th colspan="${2+wks.length}" style="background:#0f1117;text-align:center;${border}${P};color:#6366f1;font-size:0.75rem;font-weight:700;white-space:nowrap">${label} ●</th>`;
-      h2 += `<th class="num" style="background:#141628;${border}${P};color:#facc15;font-size:0.63rem;white-space:nowrap">Target</th>`;
-      wks.forEach(dt => {
-        const d = parseInt(dt.slice(8,10));
-        const isFut = dt > todayStr;
-        const isActive = window._wkSortCol === dt;
-        const colBg = isActive ? 'background:#1e2045;' : 'background:#141628;';
-        const colColor = isActive ? '#a78bfa' : (isFut ? '#2d3148' : '#6b7280');
-        const sortArrow = isActive ? ' ↓' : '';
-        const cursor = isFut ? '' : 'cursor:pointer;user-select:none;';
-        const clickHandler = isFut ? '' : `onclick="window._wkSortCol=window._wkSortCol==='${dt}'?null:'${dt}';renderWeekly(rawData,'${year}')"`;
-        h2 += `<th class="num" ${clickHandler} style="${colBg}${P};font-size:0.6rem;white-space:nowrap;color:${colColor};${cursor}${isActive?'border-bottom:2px solid #a78bfa;':''}">${MO[mo-1]}&nbsp;${d}${sortArrow}</th>`;
-      });
-      // Gap column also sortable
-      const isGapActive = window._wkSortCol === `__gap__${mo}`;
-      h2 += `<th class="num" onclick="window._wkSortCol=window._wkSortCol==='__gap__${mo}'?null:'__gap__${mo}';renderWeekly(rawData,'${year}')" style="background:${isGapActive?'#1e2045':'#141628'};${P};font-size:0.63rem;white-space:nowrap;color:${isGapActive?'#a78bfa':'#6b7280'};cursor:pointer;user-select:none;${isGapActive?'border-bottom:2px solid #a78bfa;':''}">Gap${isGapActive?' ↓':''}</th>`;
+      // Collapsed: 1 col (today's cumulative badge) | Expanded: Target + weeks + Gap
+      if (isExp) {
+        h1 += `<th colspan="${2 + wks.length}" onclick="${toggleFn(mo)}" style="background:#0f1117;${border}${P};${thBase}color:#6366f1;font-size:0.75rem;">${icon} ${label} ●</th>`;
+        h2 += `<th class="num" style="background:#141628;${border}${P};color:#facc15;font-size:0.63rem;white-space:nowrap">Target</th>`;
+        wks.forEach(dt => {
+          const d = parseInt(dt.slice(8, 10));
+          const isFutWk = dt > todayStr;
+          const isActive = window._wkSortCol === dt;
+          const colBg = isActive ? 'background:#1e2045;' : 'background:#141628;';
+          const colColor = isActive ? '#a78bfa' : (isFutWk ? '#2d3148' : '#6b7280');
+          const clickHandler = isFutWk ? '' : `onclick="window._wkSortCol=window._wkSortCol==='${dt}'?null:'${dt}';renderWeekly(rawData,'${year}')"`;
+          h2 += `<th class="num" ${clickHandler} style="${colBg}${P};font-size:0.6rem;white-space:nowrap;color:${colColor};${isFutWk?'':'cursor:pointer;user-select:none;'}${isActive?'border-bottom:2px solid #a78bfa;':''}">${MO[mo-1]}&nbsp;${d}${isActive?' ↓':''}</th>`;
+        });
+        const isGapActive = window._wkSortCol === `__gap__${mo}`;
+        h2 += `<th class="num" onclick="window._wkSortCol=window._wkSortCol==='__gap__${mo}'?null:'__gap__${mo}';renderWeekly(rawData,'${year}')" style="background:${isGapActive?'#1e2045':'#141628'};${P};font-size:0.63rem;white-space:nowrap;color:${isGapActive?'#a78bfa':'#6b7280'};cursor:pointer;user-select:none;${isGapActive?'border-bottom:2px solid #a78bfa;':''}">Gap${isGapActive?' ↓':''}</th>`;
+      } else {
+        const curActual = portCum(mo, todayStr);
+        const curTgt    = portTarget(mo);
+        const curPct    = curTgt > 0 ? Math.round(curActual / curTgt * 100) : null;
+        const pctColor  = curPct === null ? '#6b7280' : curPct >= 100 ? '#34d399' : curPct >= 70 ? '#facc15' : '#f87171';
+        const collBadge = curPct !== null ? ` <span style="color:${pctColor};font-size:0.6rem">(${curPct}%)</span>` : '';
+        h1 += `<th colspan="1" onclick="${toggleFn(mo)}" style="background:#0f1117;${border}${Ps};${thBase}color:#6366f1;font-size:0.72rem;">${icon} ${label} ●${collBadge}</th>`;
+        h2 += `<th class="num" style="background:#141628;${border}${Ps};font-size:0.63rem;white-space:nowrap;color:#6b7280">MTD</th>`;
+      }
+
     } else {
-      // future — 1 col only
-      h1 += `<th colspan="1" style="background:#0f1117;text-align:center;${border}${Ps};color:#2d3148;font-size:0.73rem;font-weight:700;white-space:nowrap">${label}</th>`;
-      h2 += `<th class="num" style="background:#141628;${border}${Ps};font-size:0.63rem;white-space:nowrap;color:#2d3148">Target</th>`;
+      // Future — Collapsed: 1 col (target) | Expanded: Target + weeks + Needed
+      if (isExp) {
+        h1 += `<th colspan="${2 + wks.length}" onclick="${toggleFn(mo)}" style="background:#0f1117;${border}${Ps};${thBase}color:#4b5563;font-size:0.72rem;">${icon} ${label}</th>`;
+        h2 += `<th class="num" style="background:#141628;${border}${Ps};color:#facc15;font-size:0.63rem;white-space:nowrap">Target</th>`;
+        wks.forEach(dt => {
+          const d = parseInt(dt.slice(8, 10));
+          h2 += `<th class="num" style="background:#141628;${Ps};font-size:0.6rem;white-space:nowrap;color:#2d3148">${MO[mo-1]}&nbsp;${d}</th>`;
+        });
+        h2 += `<th class="num" style="background:#141628;${Ps};font-size:0.63rem;white-space:nowrap;color:#2d3148">Needed</th>`;
+      } else {
+        h1 += `<th colspan="1" onclick="${toggleFn(mo)}" style="background:#0f1117;${border}${Ps};${thBase}color:#4b5563;font-size:0.72rem;">${icon} ${label}</th>`;
+        h2 += `<th class="num" style="background:#141628;${border}${Ps};font-size:0.63rem;white-space:nowrap;color:#2d3148">Target</th>`;
+      }
     }
   });
   h1 += '</tr>';
@@ -2482,28 +2518,47 @@ function renderWeekly(data, yearFilter) {
 
       } else if (type === 'current') {
         const wks = weekDates(mo);
-        // Target
-        row += `<td class="num" style="${bg}${border}${P};color:#facc15;font-weight:700;font-size:0.78rem;white-space:nowrap">${tgt>0?fmt(tgt):isClosed?'<span style="color:#374151;font-size:0.68rem">Closed</span>':'<span style="color:#374151">—</span>'}</td>`;
-        // Week cells
-        wks.forEach(dt => {
-          const isFut  = dt > todayStr;
-          const actual = isPort ? portCum(mo,dt) : cumRev(pid,mo,dt);
-          const isNow  = !isFut && (new Date(todayStr)-new Date(dt)) < 8*86400000;
-          const { bg: cBg, color } = cellStyle(actual, tgt, isFut, isClosed);
-          const pct = tgt>0&&actual>0&&!isFut ? `<div style="font-size:0.57rem;color:${color};margin-top:1px">${(actual/tgt*100).toFixed(0)}%</div>` : '';
-          const outline = isNow ? 'outline:2px solid #6366f1;outline-offset:-2px;' : '';
-          row += `<td class="num" style="${bg}${cBg}${outline}${P};white-space:nowrap">
-            <div style="font-size:0.78rem;font-weight:600;color:${color}">${isFut&&!actual?'—':actual?fmtShort(actual):'$0'}</div>${pct}
-          </td>`;
-        });
-        // Gap
-        const finalActual = isPort ? portCum(mo, monthEnd(mo)) : cumRev(pid, mo, monthEnd(mo));
-        const { html: gapHtml } = gapBadge(finalActual, tgt, isClosed);
-        row += `<td class="num" style="${bg}${P};white-space:nowrap;font-size:0.75rem">${gapHtml}</td>`;
+        if (isExp) {
+          // Expanded: Target + week cells + Gap
+          row += `<td class="num" style="${bg}${border}${P};color:#facc15;font-weight:700;font-size:0.78rem;white-space:nowrap">${tgt>0?fmt(tgt):isClosed?'<span style="color:#374151;font-size:0.68rem">Closed</span>':'<span style="color:#374151">—</span>'}</td>`;
+          wks.forEach(dt => {
+            const isFut  = dt > todayStr;
+            const actual = isPort ? portCum(mo,dt) : cumRev(pid,mo,dt);
+            const isNow  = !isFut && (new Date(todayStr)-new Date(dt)) < 8*86400000;
+            const { bg: cBg, color } = cellStyle(actual, tgt, isFut, isClosed);
+            const pct = tgt>0&&actual>0&&!isFut ? `<div style="font-size:0.57rem;color:${color};margin-top:1px">${(actual/tgt*100).toFixed(0)}%</div>` : '';
+            const outline = isNow ? 'outline:2px solid #6366f1;outline-offset:-2px;' : '';
+            row += `<td class="num" style="${bg}${cBg}${outline}${P};white-space:nowrap"><div style="font-size:0.78rem;font-weight:600;color:${color}">${isFut&&!actual?'—':actual?fmtShort(actual):'$0'}</div>${pct}</td>`;
+          });
+          const finalActual = isPort ? portCum(mo, monthEnd(mo)) : cumRev(pid, mo, monthEnd(mo));
+          const { html: gapHtml } = gapBadge(finalActual, tgt, isClosed);
+          row += `<td class="num" style="${bg}${P};white-space:nowrap;font-size:0.75rem">${gapHtml}</td>`;
+        } else {
+          // Collapsed: MTD cumulative only
+          const actual = isPort ? portCum(mo, todayStr) : cumRev(pid, mo, todayStr);
+          const { bg: cBg, color } = cellStyle(actual, tgt, false, isClosed);
+          const pct = tgt>0&&actual>0 ? `<div style="font-size:0.56rem;color:${color};margin-top:1px">${(actual/tgt*100).toFixed(0)}%</div>` : '';
+          row += `<td class="num" style="${bg}${cBg}${border}${Ps};white-space:nowrap"><div style="font-size:0.75rem;font-weight:600;color:${color}">${actual?fmtShort(actual):'$0'}</div>${pct}</td>`;
+        }
 
       } else {
-        // Future: just target
-        row += `<td class="num" style="${bg}${border}${Ps};white-space:nowrap;color:#374151;font-size:0.73rem">${tgt>0?fmt(tgt):isClosed?'<span style="color:#374151;font-size:0.68rem">Closed</span>':'<span style="color:#374151">—</span>'}</td>`;
+        // Future month
+        const wks = weekDates(mo);
+        if (isExp) {
+          // Expanded: Target + future week cells (all —) + Needed
+          row += `<td class="num" style="${bg}${border}${Ps};color:#facc15;font-weight:700;font-size:0.75rem;white-space:nowrap">${tgt>0?fmt(tgt):isClosed?'<span style="color:#374151;font-size:0.68rem">Closed</span>':'<span style="color:#374151">—</span>'}</td>`;
+          wks.forEach(() => {
+            row += `<td class="num" style="${bg}${Ps};white-space:nowrap;color:#2d3148;font-size:0.73rem">—</td>`;
+          });
+          // Needed = full target (no revenue yet)
+          const neededHtml = !isClosed && tgt > 0
+            ? `<span style="color:#4b5563;font-size:0.73rem">${fmt(tgt)}</span>`
+            : `<span style="color:#374151">—</span>`;
+          row += `<td class="num" style="${bg}${Ps};white-space:nowrap">${neededHtml}</td>`;
+        } else {
+          // Collapsed: just target (greyed)
+          row += `<td class="num" style="${bg}${border}${Ps};white-space:nowrap;color:#374151;font-size:0.73rem">${tgt>0?fmt(tgt):isClosed?'<span style="color:#374151;font-size:0.68rem">Closed</span>':'<span style="color:#374151">—</span>'}</td>`;
+        }
       }
     });
 
