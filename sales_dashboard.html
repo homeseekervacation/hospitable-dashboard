@@ -209,7 +209,26 @@
   .fl-eng { display: flex; gap: 3px; margin-top: 3px; }
   .fl-eng-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); }
   .fl-eng-dot.on { background: var(--accent); }
-  .fl-action-text { font-size: 11px; color: var(--muted); margin-top: 2px; max-width: 340px; }
+  .fl-action-text { font-size: 11px; color: var(--muted); margin-top: 2px; max-width: 280px; }
+  .fl-contact { display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }
+  .fl-chip { display: inline-flex; align-items: center; gap: 4px; font-size: 10px; color: var(--muted); white-space: nowrap; }
+  .fl-chip a { color: var(--muted); text-decoration: none; }
+  .fl-chip a:hover { color: var(--text); }
+  .sms-btn { background: var(--green); border: none; border-radius: 4px; color: #fff; font-size: 10px; font-weight: 700; padding: 3px 9px; cursor: pointer; white-space: nowrap; margin-top: 5px; }
+  .sms-btn:hover { opacity: .85; }
+  .sms-btn:disabled { background: var(--border); color: var(--muted); cursor: default; }
+  /* SMS Modal */
+  .sms-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.65); z-index: 2000; display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity .15s; }
+  .sms-modal-bg.open { opacity: 1; pointer-events: all; }
+  .sms-modal-box { background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 22px; width: 440px; max-width: 92vw; }
+  .sms-modal-box h3 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+  .sms-modal-meta { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+  .sms-modal-box textarea { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 12px; padding: 9px 10px; resize: vertical; height: 100px; margin-top: 4px; }
+  .sms-char { font-size: 10px; color: var(--muted); text-align: right; margin-top: 2px; }
+  .sms-modal-btns { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+  .sms-send-btn { background: var(--green); border: none; border-radius: 5px; color: #fff; font-size: 12px; font-weight: 700; padding: 7px 18px; cursor: pointer; }
+  .sms-send-btn:hover { opacity: .88; }
+  .sms-status { font-size: 11px; margin-top: 8px; min-height: 16px; }
 
   /* Pipeline overview cards */
   .pip-cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 20px; }
@@ -473,6 +492,22 @@
 </div>
 
 </div><!-- /container -->
+
+<!-- ── SMS MODAL ── -->
+<div class="sms-modal-bg" id="smsModal" onclick="if(event.target===this)closeSmsModal()">
+  <div class="sms-modal-box">
+    <h3>💬 Send SMS</h3>
+    <div class="sms-modal-meta" id="smsModalMeta"></div>
+    <label style="font-size:11px;color:var(--muted)">Message</label>
+    <textarea id="smsModalText" oninput="document.getElementById('smsCharCount').textContent=this.value.length+'/160'"></textarea>
+    <div class="sms-char" id="smsCharCount">0/160</div>
+    <div class="sms-status" id="smsStatus"></div>
+    <div class="sms-modal-btns">
+      <button class="btn-secondary" onclick="closeSmsModal()">Cancel</button>
+      <button class="sms-send-btn" id="smsSendBtn" onclick="sendSms()">Send via GHL</button>
+    </div>
+  </div>
+</div>
 
 <!-- ── SETTINGS MODAL ── -->
 <div class="modal-bg" id="settingsModal" onclick="if(event.target===this)closeSettings()">
@@ -981,7 +1016,7 @@ const CRM_PROSPECTS = {
     "Sasan": {
       fullName: "Sasan Yazdi", property: "Airbnb/CottagesinCanada — $80K/yr · 6yrs hosting", value: 100000,
       stage: "Owners Report Sent", pipeline: "Host Program", daysSinceCreated: 439, source: "CSV Import",
-      contactId: null, leadScore: 88,
+      contactId: null, phone: null, email: null, leadScore: 88,
       priority: "fire",
       action: "<strong>🔥 Resend contract TODAY</strong> then call immediately to confirm receipt. He said he never got it (Feb 25). He was \"ready to go\" in Feb — don't lose momentum. Call after 5pm.",
       note: "Long history of communication gaps. Ice dam damage concern was raised in 2025 but Jan 2026 notes say he's ready. Farid (friend) is the liaison."
@@ -989,7 +1024,7 @@ const CRM_PROSPECTS = {
     "Tim Trian": {
       fullName: "Tim Trian", property: "4090 Appleby Line, Burlington — pickleball, sports court, sleeps 12", value: 150000,
       stage: "Owners Report Sent", pipeline: "Cottage Leads", daysSinceCreated: 18, source: "Facebook Ad",
-      contactId: "zkBMDFMYqmY6IAfk2ghs", leadScore: 82,
+      contactId: "zkBMDFMYqmY6IAfk2ghs", phone: "+14163199705", email: "timothy@teamtrian.com", leadScore: 82,
       priority: "fire",
       action: "<strong>🔥 Book follow-up call this week.</strong> Only on VRBO — pitch multi-platform (add Airbnb). Anchor on $150K value. Address his cleaning/ops pain point directly. Had call Mar 5, follow-up Mar 12.",
       note: "~$80K/yr currently with 7–8 bookings. ADR $2–3K/night. Not there in winter. Massive upside with Airbnb + World Cup demand coming."
@@ -997,7 +1032,7 @@ const CRM_PROSPECTS = {
     "Alok Paliwal": {
       fullName: "Alok Paliwal", property: "2 cottages — Bay Lake & Doe Lake, Muskoka. Earns $90K/yr", value: 185000,
       stage: "Owners Report Sent", pipeline: "Host Program", daysSinceCreated: 53, source: "Manual",
-      contactId: "cNfyGeYuLE2BrV2woWv0", leadScore: 79,
+      contactId: "cNfyGeYuLE2BrV2woWv0", phone: "+16477783383", email: "alokpaliwal@yahoo.com", leadScore: 79,
       priority: "fire",
       action: "<strong>🔥 Schedule in-person walkthrough now.</strong> He wants off-season help — summer is already booked. Focus pitch on shoulder season optimization. He earns $7K/wk gross. Two properties = double the win.",
       note: "Builder with his own construction & cleaning crew. Handles his own guest comms. Self-manages on muskokalakesrentals.com. Wants help with bookings only."
@@ -1005,7 +1040,7 @@ const CRM_PROSPECTS = {
     "Ewa": {
       fullName: "Ewa Jarzak", property: "On Airbnb + CottagesinCanada", value: 109000,
       stage: "Owners Report Sent", pipeline: "Cottage Leads", daysSinceCreated: 41, source: "Manual",
-      contactId: "JkalaySbqgFmQSUMKdWl", leadScore: 74,
+      contactId: "JkalaySbqgFmQSUMKdWl", phone: "+14167271786", email: null, leadScore: 74,
       priority: "hot",
       action: "<strong>⚡ Try a different touch.</strong> VMs not working. Send a personalized Loom video walking through her specific listing performance vs. what we could achieve. Then text.",
       note: "Cancelled one meeting. Has active Airbnb listing. No email on file — phone only (+1 416-727-1786)."
@@ -1013,7 +1048,7 @@ const CRM_PROSPECTS = {
     "Amit Joshi": {
       fullName: "Amit Joshi", property: "Lake of Bays — 3-bed, sleeps 8–10, games room. $45K net/yr", value: 84000,
       stage: "Owners Report Sent", pipeline: "Cottage Leads", daysSinceCreated: 845, source: "Referral",
-      contactId: "FmnDa7GrpovBwh3gayMx", leadScore: 95,
+      contactId: "FmnDa7GrpovBwh3gayMx", phone: "+14164173848", email: "amit106@gmail.com", leadScore: 95,
       priority: "hot",
       action: "<strong>⚡ Try calling at a different time.</strong> Left VM Mar 19. This lead has been open 2+ years. Send a 1-line text: \"Amit — quick question about your Lake of Bays property, got 2 mins?\"",
       note: "Has existing PM team on revenue-share. We offered custom revenue report. Lead score: 95/100 — high intent signal."
@@ -1021,7 +1056,7 @@ const CRM_PROSPECTS = {
     "Gord Fawcett": {
       fullName: "Gord Fawcett", property: "4 properties: Barrie (Lake Simcoe), Durham (300 acres), Hillsburgh, McCullough Lake (Owen Sound)", value: 0,
       stage: "Inquired", pipeline: "Cottage Leads", daysSinceCreated: 33, source: "Facebook",
-      contactId: "r0EslK0zOW9MPZRhMFiw", leadScore: 61,
+      contactId: "r0EslK0zOW9MPZRhMFiw", phone: "+14166892778", email: "gordf@issmfg.com", leadScore: 61,
       priority: "hot",
       action: "<strong>⚡ Follow up for property addresses.</strong> He promised to send details. Start with the Barrie house (near Lake Simcoe — most rental-ready). A 4-property investor is a major account.",
       note: "Investor with 4 properties. Barn in Hillsburgh could be event/wedding venue. Actively looking to monetize. Lead score: 61."
@@ -1029,7 +1064,7 @@ const CRM_PROSPECTS = {
     "James MacDonald": {
       fullName: "James MacDonald", property: "583 Sweet Portage, Port Severn — 4-season, Gloucester Pool", value: 48000,
       stage: "Owners Report Sent", pipeline: "Cottage Leads", daysSinceCreated: 100, source: "Facebook Ad",
-      contactId: "tpNdPp4UlxH3AzvXZqR2", leadScore: 62,
+      contactId: "tpNdPp4UlxH3AzvXZqR2", phone: "+15192173584", email: "skordog@yahoo.ca", leadScore: 62,
       priority: "hot",
       action: "<strong>⚡ He's back from Florida — call now.</strong> Offer the pricing concession: 20% full service + $100/mo tech fee for 1 year. Needs wife buy-in, so suggest a 3-way intro call.",
       note: "Price-sensitive. July–Aug already booked ($450–500/night). Uses Beyond Pricing. Wants off-season bookings. Lead score: 62."
@@ -1037,7 +1072,7 @@ const CRM_PROSPECTS = {
     "Karen Wookey": {
       fullName: "Karen Wookey", property: "606461 River Rd, Mulmur — 3-bed, barrel sauna, swim pond, chef's kitchen", value: 65000,
       stage: "Engaged Leads", pipeline: "Cottage Leads", daysSinceCreated: 20, source: "Chat Widget (Organic)",
-      contactId: "LgY7JGaaZ99MAwyCuKju", leadScore: 70,
+      contactId: "LgY7JGaaZ99MAwyCuKju", phone: "+14168372511", email: "kwookey@gmail.com", leadScore: 70,
       priority: "warm",
       action: "<strong>📅 Follow up after Mar 31.</strong> She's away last week of March. Photos being done by her photographer when weather improves. Wants 30-day rentals only (primary residence). Touch base Apr 1.",
       note: "Walked the property. Interested in monthly rentals to travel. Has barrel sauna, swim pond, mountain bikes. All-season potential."
@@ -1045,7 +1080,7 @@ const CRM_PROSPECTS = {
     "Sameer Ahmed": {
       fullName: "Sameer Ahmed", property: "Campbelleville — 7,000 sq ft + 4-bed in Oakville (2 properties)", value: 0,
       stage: "Inquired", pipeline: "Cottage Leads", daysSinceCreated: 6, source: "Manual",
-      contactId: "k4XqBcy5HCpqOgtCNF1H", leadScore: 68,
+      contactId: "k4XqBcy5HCpqOgtCNF1H", phone: "+16478663635", email: "sameer.ahmed.ca@gmail.com", leadScore: 68,
       priority: "warm",
       action: "<strong>📅 Follow up this week.</strong> He's doing a financial analysis. A 7,000 sq ft property in Campbelleville + 4-bed in Oakville = massive dual-property deal. Send a tailored revenue projection for each.",
       note: "Bought during COVID, considering renting vs. selling. Sent contract + owner guide. Revenue comps already shared."
@@ -1053,7 +1088,7 @@ const CRM_PROSPECTS = {
     "David Reeves": {
       fullName: "David Reeves", property: "1583 Acton Island Lot 2 — seasonal cottage", value: 0,
       stage: "Inquired", pipeline: "Cottage Leads", daysSinceCreated: 6, source: "Zapier/OpenPhone",
-      contactId: "pGIySJWlGrH9nb0gUg8E", leadScore: 58,
+      contactId: "pGIySJWlGrH9nb0gUg8E", phone: "+14163462002", email: "david@beveragemerch.com", leadScore: 58,
       priority: "warm",
       action: "<strong>📅 Give until ~Mar 26, then call.</strong> Sent pricing, contract &amp; owner guide. Followed up by text Mar 23 — they're reviewing. Call to walk through any questions.",
       note: "Wants a few weeks in summer + off-season. Has reviewed materials as of Mar 23. Active engagement — timing is good."
@@ -1061,7 +1096,7 @@ const CRM_PROSPECTS = {
     "Domenico": {
       fullName: "Domenico Mastronardi", property: "52 Brooke Ave, Tiny Township — basement needs reno before listing", value: 0,
       stage: "Inquired", pipeline: "Cottage Leads", daysSinceCreated: 34, source: "Facebook Ad",
-      contactId: "GIuQUSdj0BRmE889BbDG", leadScore: 55,
+      contactId: "GIuQUSdj0BRmE889BbDG", phone: "+16472344743", email: "dmastronardi76@gmail.com", leadScore: 55,
       priority: "warm",
       action: "<strong>📅 Send STR regs + revenue report, then book a call.</strong> He's confused about Tiny Township regulations. Promised to send this info. Do it this week — it unlocks the next conversation.",
       note: "Never listed on STR before. Past noise complaints from neighbours. Needs hand-holding on regulations. Solid lead per team notes."
@@ -1069,7 +1104,7 @@ const CRM_PROSPECTS = {
     "Corrine": {
       fullName: "Corinne MacMillan", property: "Otter Lake, 20 min south of Parry Sound — 5-bed/2-bath, lakefront, winterized", value: 65000,
       stage: "Owners Report Sent", pipeline: "Cottage Leads", daysSinceCreated: 42, source: "Facebook Ad",
-      contactId: "SCGaHEQBiEJbEBF2TdRP", leadScore: 91,
+      contactId: "SCGaHEQBiEJbEBF2TdRP", phone: null, email: null, leadScore: 91,
       priority: "fire",
       action: "<strong>🔥 End-of-month walkthrough — close the contract.</strong> Video walkthrough with Marisa completed Feb 28. End-of-month closing call confirmed. Have contract ready to sign. She wants full-season management — winterized property with year-round potential.",
       note: "5-bed/2-bath lakefront on Otter Lake. Sauna planned for summer. 3 kayaks, paddleboards, BBQ, smoker. Currently Airbnb-only, summer-focused (60–70% occupancy). Wants year-round optimization. Noted as solid closing lead by Ali Abdali. $65K value."
@@ -1077,7 +1112,7 @@ const CRM_PROSPECTS = {
     "Monty": {
       fullName: "Monty", property: "4 Georgian Pine Dr", value: 0,
       stage: "Not in CRM", pipeline: "—", daysSinceCreated: null, source: "—",
-      contactId: null, leadScore: 45,
+      contactId: null, phone: null, email: null, leadScore: 45,
       priority: "warm",
       action: "<strong>📅 Contract sent, pending review.</strong> Saturday walkthrough done. Ali to follow up. Check if CRM record exists under a different name.",
       note: "Contract sent. Previously non-responsive by phone. Walkthrough completed."
@@ -1217,6 +1252,8 @@ function renderFollowUpLeads() {
       ? '<span class="st sfb-hot">⚡ High priority</span>'
       : '<span class="st sfb-warm">📅 Follow up</span>';
 
+  const fmtPhone = ph => ph ? ph.replace(/^\+1(\d{3})(\d{3})(\d{4})$/, '($1) $2-$3') : null;
+
   document.getElementById('followUpLeadsEl').innerHTML = `
     <table class="fl-table">
       <thead>
@@ -1224,6 +1261,7 @@ function renderFollowUpLeads() {
           <th>#</th>
           <th>Score</th>
           <th>Prospect</th>
+          <th>Contact</th>
           <th>Stage / Value</th>
           <th>Engagement</th>
           <th>Priority</th>
@@ -1231,13 +1269,22 @@ function renderFollowUpLeads() {
         </tr>
       </thead>
       <tbody>
-        ${rows.map((p, i) => `<tr>
+        ${rows.map((p, i) => {
+          const ph = fmtPhone(p.phone);
+          const contactHtml = `
+            <div class="fl-contact">
+              ${ph ? `<div class="fl-chip">📞 <a href="tel:${p.phone}">${ph}</a></div>` : '<div class="fl-chip" style="color:var(--border)">📞 —</div>'}
+              ${p.email ? `<div class="fl-chip">✉ <a href="mailto:${p.email}">${p.email}</a></div>` : ''}
+              ${p.contactId && p.phone ? `<button class="sms-btn" onclick="openSmsModal('${p.contactId}','${p.phone}','${p.fullName.replace(/'/g,"\\'")}')">💬 Send SMS</button>` : ''}
+            </div>`;
+          return `<tr>
           <td style="color:var(--muted)">${i+1}</td>
           <td><span class="fl-score ${scoreClass(p.score)}">${p.score}</span></td>
           <td>
             <div style="font-weight:700">${p.fullName}</div>
             <div style="font-size:10px;color:var(--muted);margin-top:2px">${p.property.slice(0,45)}${p.property.length>45?'…':''}</div>
           </td>
+          <td>${contactHtml}</td>
           <td>
             <div style="color:var(--muted);font-size:11px">${p.stage}</div>
             <div style="font-weight:700;color:${p.value > 0 ? 'var(--green)' : 'var(--muted)'};">${p.value > 0 ? '$'+Math.round(p.value/1000)+'K' : '—'}</div>
@@ -1249,8 +1296,8 @@ function renderFollowUpLeads() {
             </div>
           </td>
           <td>${priBadge(p.priority)}</td>
-          <td class="fl-action-text">${stripHtml(p.action).replace(/^[🔥⚡📅]+\s*/,'').slice(0,90)}…</td>
-        </tr>`).join('')}
+          <td class="fl-action-text">${stripHtml(p.action).replace(/^[🔥⚡📅]+\s*/,'').slice(0,80)}…</td>
+        </tr>`;}).join('')}
       </tbody>
     </table>`;
 }
@@ -1461,6 +1508,65 @@ function saveSettings() {
 function updateSyncDot() {
   const dot = document.getElementById('syncDot');
   if (dot) dot.className = 'sync-dot' + (localStorage.getItem('hs_ghl_token') ? ' on' : '');
+}
+
+// ── SMS Modal ──
+let _smsContactId = null;
+function openSmsModal(contactId, phone, name) {
+  _smsContactId = contactId;
+  document.getElementById('smsModalMeta').textContent = `To: ${name}  ·  ${phone}`;
+  document.getElementById('smsModalText').value = '';
+  document.getElementById('smsCharCount').textContent = '0/160';
+  document.getElementById('smsStatus').textContent = '';
+  document.getElementById('smsSendBtn').disabled = false;
+  document.getElementById('smsModal').classList.add('open');
+  setTimeout(() => document.getElementById('smsModalText').focus(), 80);
+}
+function closeSmsModal() {
+  document.getElementById('smsModal').classList.remove('open');
+  _smsContactId = null;
+}
+async function sendSms() {
+  const token = localStorage.getItem('hs_ghl_token');
+  if (!token) {
+    document.getElementById('smsStatus').innerHTML = '<span style="color:var(--red)">No GHL token — open Settings first.</span>';
+    return;
+  }
+  const msg = document.getElementById('smsModalText').value.trim();
+  if (!msg) {
+    document.getElementById('smsStatus').innerHTML = '<span style="color:var(--amber)">Message is empty.</span>';
+    return;
+  }
+  const btn = document.getElementById('smsSendBtn');
+  btn.disabled = true;
+  btn.textContent = 'Sending…';
+  document.getElementById('smsStatus').textContent = '';
+  try {
+    const res = await fetch('https://services.leadconnectorhq.com/conversations/messages', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Version': '2021-04-15',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ type: 'SMS', contactId: _smsContactId, message: msg }),
+    });
+    const json = await res.json();
+    if (res.ok) {
+      document.getElementById('smsStatus').innerHTML = '<span style="color:var(--green)">✓ SMS sent via GHL.</span>';
+      btn.textContent = 'Sent ✓';
+      setTimeout(closeSmsModal, 1400);
+    } else {
+      const err = json.message || json.error || res.status;
+      document.getElementById('smsStatus').innerHTML = `<span style="color:var(--red)">Error: ${err}</span>`;
+      btn.disabled = false;
+      btn.textContent = 'Send via GHL';
+    }
+  } catch(e) {
+    document.getElementById('smsStatus').innerHTML = `<span style="color:var(--red)">Network error: ${e.message}</span>`;
+    btn.disabled = false;
+    btn.textContent = 'Send via GHL';
+  }
 }
 
 // ═══════════════════ OUTREACH LIST DATA (from GHL — 312 open opps, Mar 24 2026) ═══════════════════
