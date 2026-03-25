@@ -2087,40 +2087,54 @@ async function refreshAllData() {
 async function refreshGHLFullData(token) {
   const headers = { 'Authorization': `Bearer ${token}`, 'Version': '2021-07-28' };
 
-  // 1. Paginate ALL opportunities (all statuses)
-  let all = [], page = 1;
+  // 1. Build stage → {stageName, pipelineName} lookup from pipelines API
+  const pipRes = await fetch(`${GHL_BASE}/opportunities/pipelines?locationId=${GHL_LOC_ID}`, { headers });
+  if (!pipRes.ok) throw new Error(`GHL pipelines ${pipRes.status}`);
+  const pipData = await pipRes.json();
+  const stageInfo = {};  // stageId → { stageName, pipelineName }
+  (pipData.pipelines || []).forEach(pip => {
+    (pip.stages || []).forEach(st => {
+      stageInfo[st.id] = { stageName: st.name, pipelineName: pip.name };
+    });
+  });
+
+  // 2. Paginate ALL opportunities — cursor-based (startAfter + startAfterId), status=all
+  let all = [], startAfter = null, startAfterId = null;
   while (true) {
-    const r = await fetch(
-      `${GHL_BASE}/opportunities/search?location_id=${GHL_LOC_ID}&limit=100&page=${page}`,
-      { headers }
-    );
+    const url = new URL(`${GHL_BASE}/opportunities/search`);
+    url.searchParams.set('location_id', GHL_LOC_ID);
+    url.searchParams.set('limit', '100');
+    url.searchParams.set('status', 'all');
+    if (startAfter)   url.searchParams.set('startAfter', startAfter);
+    if (startAfterId) url.searchParams.set('startAfterId', startAfterId);
+    const r = await fetch(url.toString(), { headers });
     if (!r.ok) throw new Error(`GHL ${r.status}`);
     const d = await r.json();
     const opps = d.opportunities || [];
     all.push(...opps);
-    const total = d.meta?.total ?? opps.length;
-    if (opps.length < 100 || all.length >= total) break;
-    page++;
+    if (!d.meta?.startAfterId || opps.length < 100) break;
+    startAfter   = d.meta.startAfter;
+    startAfterId = d.meta.startAfterId;
   }
 
-  // 2. Compute status counts
+  // 3. Compute status counts
   const wonOpps       = all.filter(o => o.pipelineStageId === GHL_WON_STAGE);
   const openCount     = all.filter(o => o.status === 'open').length;
   const lostCount     = all.filter(o => o.status === 'lost').length;
   const abandonedCount= all.filter(o => o.status === 'abandoned').length;
 
-  // 3. This week / this month leads
+  // 4. This week / this month — use createdAt (dateAdded does not exist in GHL API)
   const now = new Date();
   const sow = new Date(now); sow.setHours(0,0,0,0); sow.setDate(now.getDate() - now.getDay());
   const som = new Date(now.getFullYear(), now.getMonth(), 1);
-  const thisWeek  = all.filter(o => o.dateAdded && new Date(o.dateAdded) >= sow).length;
-  const thisMonth = all.filter(o => o.dateAdded && new Date(o.dateAdded) >= som).length;
+  const thisWeek  = all.filter(o => o.createdAt && new Date(o.createdAt) >= sow).length;
+  const thisMonth = all.filter(o => o.createdAt && new Date(o.createdAt) >= som).length;
 
-  // 4. avgCloseDays — recompute from existing wonDeals (manual data preserved)
+  // 5. avgCloseDays — recompute from existing wonDeals (manual data preserved)
   const daysArr = DATA.wonDeals.filter(d => d.days > 0).map(d => d.days);
   const avgDays = daysArr.length ? Math.round(daysArr.reduce((a,b) => a+b, 0) / daysArr.length) : DATA.metrics.avgCloseDays;
 
-  // 5. Update metrics
+  // 6. Update metrics
   DATA.metrics.totalLeads        = all.length;
   DATA.metrics.totalOpen         = openCount;
   DATA.metrics.totalWon          = wonOpps.length;
@@ -2133,7 +2147,7 @@ async function refreshGHLFullData(token) {
   DATA.metrics.thisMonthLeads    = thisMonth;
   DATA.metrics.avgCloseDays      = avgDays;
 
-  // 6. Status distribution
+  // 7. Status distribution
   DATA.statusDist = [
     {status:'Open',      count:openCount,      color:'#3b82f6'},
     {status:'Won',       count:wonOpps.length, color:'#22c55e'},
@@ -2141,48 +2155,48 @@ async function refreshGHLFullData(token) {
     {status:'Lost',      count:lostCount,      color:'#ef4444'}
   ];
 
-  // 7. Pipeline breakdown
+  // 8. Pipeline breakdown — use stageInfo lookup (pipelineName not on opp object)
   const PIPE_COLORS = ['#6c63ff','#3b82f6','#14b8a6','#f59e0b','#22c55e'];
   const pipMap = {};
   all.forEach(o => {
-    const pn = o.pipelineName || 'Unknown';
+    const pn = stageInfo[o.pipelineStageId]?.pipelineName || 'Unknown';
+    const sn = stageInfo[o.pipelineStageId]?.stageName    || 'Unknown';
     if (!pipMap[pn]) pipMap[pn] = { name:pn, count:0, stages:new Set() };
     pipMap[pn].count++;
-    if (o.pipelineStageName) pipMap[pn].stages.add(o.pipelineStageName);
+    pipMap[pn].stages.add(sn);
   });
   DATA.pipelines = Object.values(pipMap)
     .sort((a,b) => b.count - a.count)
     .map((p,i) => ({ name:p.name, count:p.count, stages:p.stages.size, color:PIPE_COLORS[i]||'#8892a4' }));
 
-  // 8. Stage values breakdown
-  const stageMap = {};
+  // 9. Stage values breakdown — use stageInfo lookup
+  const svMap = {};
   all.forEach(o => {
-    const sn = o.pipelineStageName || 'Unknown';
-    if (!stageMap[sn]) stageMap[sn] = { stage:sn, count:0, value:0 };
-    stageMap[sn].count++;
-    stageMap[sn].value += o.monetaryValue || 0;
+    const sn = stageInfo[o.pipelineStageId]?.stageName || 'Unknown';
+    if (!svMap[sn]) svMap[sn] = { stage:sn, count:0, value:0 };
+    svMap[sn].count++;
+    svMap[sn].value += o.monetaryValue || 0;
   });
-  DATA.stageValues = Object.values(stageMap)
+  DATA.stageValues = Object.values(svMap)
     .map(s => ({ ...s, value:Math.round(s.value) }))
     .sort((a,b) => b.value - a.value);
 
-  // 9. Funnel — Cottage Leads open stage counts (preserve display order)
+  // 10. Funnel — Cottage Leads open stage counts (preserve display order)
   const FUNNEL_ORDER = ['Inquired','Engaged Leads','Owners Report Sent','Agreement Sent','Onboarding','Active Clients'];
   const funnelMap = {};
-  all.filter(o => o.pipelineName === 'Cottage Leads' && o.status === 'open').forEach(o => {
-    const sn = o.pipelineStageName || 'Unknown';
+  all.filter(o => stageInfo[o.pipelineStageId]?.pipelineName === 'Cottage Leads' && o.status === 'open').forEach(o => {
+    const sn = stageInfo[o.pipelineStageId]?.stageName || 'Unknown';
     if (!funnelMap[sn]) funnelMap[sn] = { name:sn, count:0, value:0 };
     funnelMap[sn].count++;
     funnelMap[sn].value += o.monetaryValue || 0;
   });
   const funnelOrdered = FUNNEL_ORDER.filter(s => funnelMap[s]).map(s => ({ name:s, count:funnelMap[s].count, value:Math.round(funnelMap[s].value) }));
-  // Include any extra stages not in the order list
   Object.keys(funnelMap).filter(s => !FUNNEL_ORDER.includes(s)).forEach(s =>
     funnelOrdered.push({ name:s, count:funnelMap[s].count, value:Math.round(funnelMap[s].value) })
   );
   if (funnelOrdered.length > 0) DATA.funnel = funnelOrdered;
 
-  // 10. Weekly / monthly lead flow from dateAdded
+  // 11. Weekly / monthly lead flow — use createdAt (not dateAdded)
   function isoWeek(dateStr) {
     const d = new Date(dateStr);
     const thu = new Date(d); thu.setDate(d.getDate() - ((d.getDay()+6)%7) + 3);
@@ -2192,8 +2206,8 @@ async function refreshGHLFullData(token) {
   }
   const weekMap = {}, monthMap = {};
   all.forEach(o => {
-    if (!o.dateAdded) return;
-    const ds = typeof o.dateAdded === 'string' ? o.dateAdded.slice(0,10) : new Date(o.dateAdded).toISOString().slice(0,10);
+    if (!o.createdAt) return;
+    const ds = o.createdAt.slice(0,10);
     const w = isoWeek(ds); weekMap[w] = (weekMap[w]||0) + 1;
     const m2 = ds.slice(0,7); monthMap[m2] = (monthMap[m2]||0) + 1;
   });
@@ -2201,7 +2215,7 @@ async function refreshGHLFullData(token) {
   DATA.monthlyLeads = Object.keys(monthMap).sort().map(m2 => ({month:m2, count:monthMap[m2]}));
   DATA.weekly2026   = DATA.weeklyLeads.filter(w => w.week.startsWith('2026-')).map(w => ({week:w.week.replace('2026-',''), count:w.count}));
 
-  // 11. Won deals — detect + prepend new ones (fuzzy name match, preserve manual fields)
+  // 12. Won deals — detect + prepend new ones (fuzzy name match, preserve manual fields)
   const norm = s => s.toLowerCase().replace(/[^a-z0-9]/g, '');
   const existingKeys = new Set(DATA.wonDeals.map(d => norm(d.name)));
   let added = 0;
@@ -2216,8 +2230,8 @@ async function refreshGHLFullData(token) {
       DATA.wonDeals.unshift({
         name: o.name.trim(), value: o.monetaryValue || 0,
         target: 0, actualYTD: 0, actual2025: 0, days: 0,
-        closedAt: (o.lastStatusChangeAt || o.dateAdded || '').slice(0,10),
-        pipeline: o.pipelineName || 'Cottage Leads'
+        closedAt: (o.lastStatusChangeAt || o.createdAt || '').slice(0,10),
+        pipeline: stageInfo[o.pipelineStageId]?.pipelineName || 'Cottage Leads'
       });
       existingKeys.add(oNorm);
       added++;
@@ -2228,7 +2242,7 @@ async function refreshGHLFullData(token) {
   DATA.metrics.totalWonValue = DATA.wonDeals.reduce((s,d) => s + (d.value||0), 0);
   DATA.statusDist.find(s => s.status === 'Won').count = DATA.metrics.totalWon;
 
-  // 12. Re-render all components
+  // 13. Re-render all components
   renderKPIs();
   renderFunnel();
   renderPipCards();
