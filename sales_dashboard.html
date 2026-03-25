@@ -341,13 +341,13 @@
     </div>
     <div class="kpi-card c-amber">
       <div class="kpi-label">Open in Pipeline</div>
-      <div class="kpi-value" id="k-open">312</div>
+      <div class="kpi-value" id="k-open">306</div>
       <div class="kpi-sub">Active leads</div>
     </div>
     <div class="kpi-card c-green">
       <div class="kpi-label">Won Deals</div>
-      <div class="kpi-value" id="k-won">23</div>
-      <div class="kpi-sub" id="k-won-sub">$1,239,100 closed</div>
+      <div class="kpi-value" id="k-won">25</div>
+      <div class="kpi-sub" id="k-won-sub">$1.5M closed</div>
     </div>
     <div class="kpi-card c-teal">
       <div class="kpi-label">Close Rate</div>
@@ -356,12 +356,12 @@
     </div>
     <div class="kpi-card c-amber">
       <div class="kpi-label">Pipeline Value</div>
-      <div class="kpi-value" id="k-pipeline-val">$5.2M</div>
+      <div class="kpi-value" id="k-pipeline-val">$8.1M</div>
       <div class="kpi-sub">Open opportunities</div>
     </div>
     <div class="kpi-card">
       <div class="kpi-label">Avg Close Time</div>
-      <div class="kpi-value" id="k-avg-close">86d</div>
+      <div class="kpi-value" id="k-avg-close">94d</div>
       <div class="kpi-sub">Lead → Won</div>
     </div>
   </div>
@@ -621,7 +621,7 @@
 // GHL last synced: Mar 23 2026 | Hospitable last synced: Mar 24 2026
 // ═══════════════════════════════════════════════════════
 const DATA = {
-  metrics: { totalLeads:382, thisWeekLeads:0, thisMonthLeads:14, totalOpen:311, totalWon:23, totalLost:14, totalAbandoned:34, totalPipelineValue:5154811, totalWonValue:1239100, closeRate:6.0, avgCloseDays:86,
+  metrics: { totalLeads:382, thisWeekLeads:1, thisMonthLeads:14, totalOpen:306, totalWon:25, totalLost:14, totalAbandoned:34, totalPipelineValue:8114466, totalWonValue:1482600, closeRate:6.0, avgCloseDays:94,
              activeProperties:22, totalBookings2026:130 },
   // Hospitable API — 2026 YTD (as of Mar 24 2026)
   hospitable: {
@@ -640,27 +640,26 @@ const DATA = {
   weekly2026: [{"week":"W02","count":4},{"week":"W03","count":3},{"week":"W04","count":13},{"week":"W05","count":13},{"week":"W06","count":6},{"week":"W07","count":8},{"week":"W08","count":7},{"week":"W09","count":5},{"week":"W10","count":6},{"week":"W11","count":3},{"week":"W12","count":4}],
 
   funnel: [
-    {"name":"Inquired","count":10,"value":55000},
-    {"name":"Engaged Leads","count":100,"value":255000},
+    {"name":"Inquired","count":83,"value":55000},
+    {"name":"Engaged Leads","count":27,"value":255000},
     {"name":"Owners Report Sent","count":22,"value":1841000},
-    {"name":"Agreement Sent","count":2,"value":156000},
-    {"name":"Onboarding","count":2,"value":135000},
-    {"name":"Active Clients","count":5,"value":290000}
+    {"name":"Agreement Sent","count":2,"value":156000}
   ],
 
   stageValues: [
+    {"stage":"Closed","count":161,"value":2893610},
     {"stage":"Owners Report Sent","count":24,"value":1891000},
-    {"stage":"Active Clients","count":25,"value":1369100},
-    {"stage":"Closed","count":112,"value":1151555},
+    {"stage":"Active Clients","count":23,"value":1382600},
     {"stage":"Investor Clients","count":12,"value":545000},
     {"stage":"Engaged Lead","count":13,"value":509440},
-    {"stage":"Engaged Leads","count":105,"value":255000},
-    {"stage":"Onboarding","count":3,"value":190000},
-    {"stage":"Hold","count":9,"value":168928},
+    {"stage":"Hold","count":11,"value":308928},
+    {"stage":"Engaged Leads","count":32,"value":255000},
     {"stage":"Agreement Sent","count":2,"value":156000},
-    {"stage":"Inquired","count":13,"value":55000},
+    {"stage":"Onboarding","count":1,"value":65000},
+    {"stage":"Inquired","count":87,"value":55000},
     {"stage":"Referred","count":5,"value":48000},
-    {"stage":"Proposal Sent","count":2,"value":4888}
+    {"stage":"Proposal Sent","count":2,"value":4888},
+    {"stage":"New Lead","count":9,"value":0}
   ],
 
   // value = GHL deal value (agreed at time of close)
@@ -702,8 +701,8 @@ const DATA = {
   portfolioTarget: 1535865, // total 2026 annual target across all 29 properties (revenue_targets.csv)
 
   statusDist: [
-    {"status":"Open","count":312,"color":"#3b82f6"},
-    {"status":"Won","count":23,"color":"#22c55e"},
+    {"status":"Open","count":306,"color":"#3b82f6"},
+    {"status":"Won","count":25,"color":"#22c55e"},
     {"status":"Abandoned","count":34,"color":"#f59e0b"},
     {"status":"Lost","count":14,"color":"#ef4444"}
   ],
@@ -712,7 +711,7 @@ const DATA = {
     {"name":"Cottage Leads","count":342,"stages":9,"color":"#6c63ff"},
     {"name":"Host Program","count":15,"stages":3,"color":"#3b82f6"},
     {"name":"Toronto Leads","count":11,"stages":5,"color":"#14b8a6"},
-    {"name":"Mid-Long Term Guest","count":9,"stages":4,"color":"#f59e0b"},
+    {"name":"Mid-Long Term Guest Leads","count":9,"stages":4,"color":"#f59e0b"},
     {"name":"Referred","count":5,"stages":3,"color":"#22c55e"}
   ]
 };
@@ -940,29 +939,8 @@ function initCharts() {
     }
   });
 
-  // Conversion horizontal bar
-  mkBar('cConv', DATA.funnel.map(f => f.name), DATA.funnel.map(f => f.count), {
-    colors: FC, horizontal: true,
-    extra: { plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => {
-      const max = DATA.funnel[0].count;
-      return ` ${ctx.raw} leads (${Math.round(ctx.raw/max*100)}% of top)`;
-    }}}}}
-  });
-
-  // Stage values bar
-  const sv = DATA.stageValues.filter(s => s.value > 0);
-  new Chart(document.getElementById('cStageVal'), {
-    type: 'bar',
-    data: { labels: sv.map(s => s.stage), datasets: [{ data: sv.map(s => s.value), backgroundColor: C, borderRadius: 4, borderWidth: 0 }] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${fmtFull(ctx.raw)}` } } },
-      scales: {
-        x: { grid: { color: '#1e2235' }, ticks: { maxRotation: 35, font: { size: 9 } } },
-        y: { grid: { color: '#1e2235' }, beginAtZero: true, ticks: { callback: fmt } }
-      }
-    }
-  });
+  // cConv and cStageVal are in the Pipeline tab (hidden at DOMContentLoaded)
+  // They are initialized in initTabCharts('pipeline') to avoid 0-dimension rendering
 
 }
 
@@ -1022,6 +1000,41 @@ function initTabCharts(id) {
     renderNextActions();
     renderFollowUpLeads();
     renderOutreachList();
+    // Stage conversion chart — direct config (mkBar's beginAtZero conflicts with horizontal category axis)
+    const FC2 = ['#6c63ff','#7c73ff','#9c93ff','#bcb3ff','#dcd3ff','#f0ecff'];
+    new Chart(document.getElementById('cConv'), {
+      type: 'bar',
+      data: { labels: DATA.funnel.map(f => f.name), datasets: [{ data: DATA.funnel.map(f => f.count), backgroundColor: FC2, borderRadius: 4, borderWidth: 0 }] },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => {
+          const max = DATA.funnel[0]?.count || 1;
+          return ` ${ctx.raw} leads (${Math.round(ctx.raw/max*100)}% of top)`;
+        }}}},
+        scales: {
+          x: { grid: { color: '#1e2235' }, beginAtZero: true, ticks: { font: { size: 10 } } },
+          y: { grid: { color: '#1e2235' }, ticks: { font: { size: 11 } } }
+        }
+      }
+    });
+    // Pipeline value by stage chart
+    const sv = DATA.stageValues.filter(s => s.value > 0);
+    const C2 = ['#6c63ff','#3b82f6','#14b8a6','#f59e0b','#22c55e','#ef4444','#8892a4','#a855f7','#06b6d4','#f97316','#84cc16','#e11d48'];
+    new Chart(document.getElementById('cStageVal'), {
+      type: 'bar',
+      data: { labels: sv.map(s => s.stage), datasets: [{ data: sv.map(s => s.value), backgroundColor: C2, borderRadius: 4, borderWidth: 0 }] },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => {
+          const v = ctx.raw; return ` ${v >= 1e6 ? '$'+(v/1e6).toFixed(1)+'M' : '$'+(v/1e3).toFixed(0)+'K'}`;
+        }}}},
+        scales: {
+          x: { grid: { color: '#1e2235' }, ticks: { maxRotation: 35, font: { size: 9 } } },
+          y: { grid: { color: '#1e2235' }, beginAtZero: true, ticks: { callback: v => v >= 1e6 ? '$'+(v/1e6).toFixed(1)+'M' : '$'+(v/1e3).toFixed(0)+'K' } }
+        }
+      }
+    });
   }
 
   if (id === 'callupdate') {
@@ -2041,11 +2054,20 @@ function renderKPIs() {
 
 // ── Chart rebuild ────────────────────────────────────────────────────────────
 function rebuildCharts() {
-  ['cLeadFlow','cStatus','cMonthly','cPipeline','cStageVal','cConv'].forEach(id => {
+  ['cLeadFlow','cStatus','cMonthly','cPipeline'].forEach(id => {
     const c = Chart.getChart(id); if (c) c.destroy();
   });
   chartLeadFlow = null;
   initCharts();
+  if (tabInited.pipeline) {
+    ['cConv','cStageVal'].forEach(id => {
+      const c = Chart.getChart(id); if (c) c.destroy();
+    });
+    tabInited.pipeline = false;
+    if (document.getElementById('tab-pipeline')?.classList.contains('active')) {
+      setTimeout(() => initTabCharts('pipeline'), 20);
+    }
+  }
   if (tabInited.deals) {
     ['cCloseTime','cDealCompare'].forEach(id => {
       const c = Chart.getChart(id); if (c) c.destroy();
@@ -2087,16 +2109,23 @@ async function refreshAllData() {
 async function refreshGHLFullData(token) {
   const headers = { 'Authorization': `Bearer ${token}`, 'Version': '2021-07-28' };
 
-  // 1. Build stage → {stageName, pipelineName} lookup from pipelines API
+  // 1. Build stage → {stageName, pipelineName, showInFunnel, position} lookup from pipelines API
   const pipRes = await fetch(`${GHL_BASE}/opportunities/pipelines?locationId=${GHL_LOC_ID}`, { headers });
   if (!pipRes.ok) throw new Error(`GHL pipelines ${pipRes.status}`);
   const pipData = await pipRes.json();
-  const stageInfo = {};  // stageId → { stageName, pipelineName }
+  const stageInfo = {};      // stageId → { stageName, pipelineName, showInFunnel, position }
+  const pipStageCounts = {}; // pipelineName → total stage count from API
   (pipData.pipelines || []).forEach(pip => {
+    pipStageCounts[pip.name] = (pip.stages || []).length;
     (pip.stages || []).forEach(st => {
-      stageInfo[st.id] = { stageName: st.name, pipelineName: pip.name };
+      stageInfo[st.id] = { stageName: st.name, pipelineName: pip.name, showInFunnel: !!st.showInFunnel, position: st.position ?? 0 };
     });
   });
+  // Build ordered funnel stage names for Cottage Leads (showInFunnel:true only, by position)
+  const cottageFunnelStages = Object.values(stageInfo)
+    .filter(s => s.pipelineName === 'Cottage Leads' && s.showInFunnel)
+    .sort((a,b) => a.position - b.position)
+    .map(s => s.stageName);
 
   // 2. Paginate ALL opportunities — cursor-based (startAfter + startAfterId), status=all
   let all = [], startAfter = null, startAfterId = null;
@@ -2167,7 +2196,7 @@ async function refreshGHLFullData(token) {
   });
   DATA.pipelines = Object.values(pipMap)
     .sort((a,b) => b.count - a.count)
-    .map((p,i) => ({ name:p.name, count:p.count, stages:p.stages.size, color:PIPE_COLORS[i]||'#8892a4' }));
+    .map((p,i) => ({ name:p.name, count:p.count, stages: pipStageCounts[p.name] || p.stages.size, color:PIPE_COLORS[i]||'#8892a4' }));
 
   // 9. Stage values breakdown — use stageInfo lookup
   const svMap = {};
@@ -2181,19 +2210,19 @@ async function refreshGHLFullData(token) {
     .map(s => ({ ...s, value:Math.round(s.value) }))
     .sort((a,b) => b.value - a.value);
 
-  // 10. Funnel — Cottage Leads open stage counts (preserve display order)
-  const FUNNEL_ORDER = ['Inquired','Engaged Leads','Owners Report Sent','Agreement Sent','Onboarding','Active Clients'];
+  // 10. Funnel — Cottage Leads open leads, showInFunnel stages only, ordered by position
   const funnelMap = {};
-  all.filter(o => stageInfo[o.pipelineStageId]?.pipelineName === 'Cottage Leads' && o.status === 'open').forEach(o => {
-    const sn = stageInfo[o.pipelineStageId]?.stageName || 'Unknown';
+  all.filter(o => stageInfo[o.pipelineStageId]?.pipelineName === 'Cottage Leads'
+                  && stageInfo[o.pipelineStageId]?.showInFunnel
+                  && o.status === 'open').forEach(o => {
+    const sn = stageInfo[o.pipelineStageId].stageName;
     if (!funnelMap[sn]) funnelMap[sn] = { name:sn, count:0, value:0 };
     funnelMap[sn].count++;
     funnelMap[sn].value += o.monetaryValue || 0;
   });
-  const funnelOrdered = FUNNEL_ORDER.filter(s => funnelMap[s]).map(s => ({ name:s, count:funnelMap[s].count, value:Math.round(funnelMap[s].value) }));
-  Object.keys(funnelMap).filter(s => !FUNNEL_ORDER.includes(s)).forEach(s =>
-    funnelOrdered.push({ name:s, count:funnelMap[s].count, value:Math.round(funnelMap[s].value) })
-  );
+  const funnelOrdered = cottageFunnelStages
+    .filter(sn => funnelMap[sn])
+    .map(sn => ({ name:sn, count:funnelMap[sn].count, value:Math.round(funnelMap[sn].value) }));
   if (funnelOrdered.length > 0) DATA.funnel = funnelOrdered;
 
   // 11. Weekly / monthly lead flow — use createdAt (not dateAdded)
