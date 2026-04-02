@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Homeseeker Revenue Manager</title>
+  <style>
+    :root {
+      --navy:       #1a1e2e;
+      --navy-light: #232840;
+      --navy-mid:   #2c3255;
+      --navy-card:  #1e2336;
+      --navy-border:#2e3556;
+      --gold:       #c9a96e;
+      --gold-light: #e0c28a;
+      --gold-dim:   #8a7049;
+      --text:       #e8eaf2;
+      --muted:      #8890aa;
+      --green:      #4ade80;
+      --red:        #f87171;
+      --orange:     #fb923c;
+      --yellow:     #fbbf24;
+      --blue:       #60a5fa;
+      --purple:     #a78bfa;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', sans-serif;
+      background: var(--navy);
+      color: var(--text);
+      min-height: 100vh;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--navy-card);
+      border-bottom: 1px solid var(--navy-border);
+      padding: 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand-mark {
+      width: 34px; height: 34px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, var(--gold) 0%, var(--gold-dim) 100%);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; font-weight: 800; color: var(--navy);
+    }
+    .brand-text h1 { font-size: 16px; font-weight: 700; color: var(--text); }
+    .brand-text p  { font-size: 11px; color: var(--gold); letter-spacing: 0.08em; text-transform: uppercase; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .refresh-btn {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--gold);
+      color: var(--navy);
+      border: none; padding: 8px 16px; border-radius: 8px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .refresh-btn:hover { opacity: 0.85; }
+    .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .last-sync { font-size: 11px; color: var(--muted); }
+
+    /* ── Main ── */
+    .main { padding: 24px 28px; max-width: 1440px; margin: 0 auto; }
+
+    /* ── KPI Cards ── */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .kpi-card {
+      background: var(--navy-card);
+      border: 1px solid var(--navy-border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+    .kpi-card::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: linear-gradient(90deg, var(--gold), transparent);
+    }
+    .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 8px; }
+    .kpi-value { font-size: 28px; font-weight: 700; line-height: 1; }
+    .kpi-sub   { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .kpi-gold  { color: var(--gold); }
+    .kpi-green { color: var(--green); }
+    .kpi-red   { color: var(--red); }
+    .kpi-blue  { color: var(--blue); }
+
+    /* ── Controls Bar ── */
+    .controls {
+      display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+    .search-wrap { position: relative; }
+    .search-wrap input {
+      background: var(--navy-card);
+      border: 1px solid var(--navy-border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 8px 12px 8px 32px;
+      font-size: 13px; width: 220px; outline: none;
+      transition: border-color 0.2s;
+    }
+    .search-wrap input:focus { border-color: var(--gold); }
+    .search-wrap .search-icon {
+      position: absolute; left: 10px; top: 50%; transform: translateY(-50%);
+      color: var(--muted); font-size: 14px; pointer-events: none;
+    }
+    select {
+      background: var(--navy-card);
+      border: 1px solid var(--navy-border);
+      border-radius: 8px; color: var(--text);
+      padding: 8px 12px; font-size: 13px; outline: none;
+      cursor: pointer;
+    }
+    select:focus { border-color: var(--gold); }
+    .flag-filter {
+      display: flex; gap: 6px; flex-wrap: wrap;
+    }
+    .flag-chip {
+      padding: 5px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+      border: 1px solid transparent;
+      cursor: pointer; transition: all 0.15s;
+      opacity: 0.5;
+    }
+    .flag-chip.active { opacity: 1; }
+    .results-count { margin-left: auto; font-size: 13px; color: var(--muted); white-space: nowrap; }
+
+    /* ── Property Grid ── */
+    .property-grid {
+      display: flex; flex-direction: column; gap: 14px;
+    }
+
+    /* ── Property Card ── */
+    .prop-card {
+      background: var(--navy-card);
+      border: 1px solid var(--navy-border);
+      border-radius: 14px;
+      padding: 20px 22px;
+      display: grid;
+      grid-template-columns: 260px 1fr 320px;
+      gap: 20px;
+      align-items: start;
+      transition: border-color 0.2s;
+    }
+    .prop-card:hover { border-color: var(--navy-mid); }
+    .prop-card.critical { border-left: 3px solid var(--red); }
+    .prop-card.warning  { border-left: 3px solid var(--orange); }
+    .prop-card.good     { border-left: 3px solid var(--green); }
+
+    /* Left: identity + score */
+    .prop-identity { }
+    .prop-name {
+      font-size: 15px; font-weight: 600; margin-bottom: 4px;
+      color: var(--text);
+    }
+    .prop-location { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+    .health-score-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .score-ring {
+      width: 52px; height: 52px; flex-shrink: 0;
+    }
+    .score-ring svg { transform: rotate(-90deg); }
+    .score-ring-track { fill: none; stroke: var(--navy-border); stroke-width: 5; }
+    .score-ring-fill  { fill: none; stroke-width: 5; stroke-linecap: round;
+                        transition: stroke-dashoffset 0.5s ease; }
+    .score-label-wrap { }
+    .score-number { font-size: 22px; font-weight: 800; line-height: 1; }
+    .score-desc   { font-size: 11px; color: var(--muted); }
+    .flag-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+    .flag-tag {
+      padding: 3px 8px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+      white-space: nowrap;
+    }
+    .flag-dead     { background: rgba(248,113,113,0.15); color: var(--red);    border: 1px solid rgba(248,113,113,0.3); }
+    .flag-overpriced { background: rgba(251,146,60,0.15); color: var(--orange); border: 1px solid rgba(251,146,60,0.3); }
+    .flag-underpriced { background: rgba(96,165,250,0.15); color: var(--blue);  border: 1px solid rgba(96,165,250,0.3); }
+    .flag-lag      { background: rgba(251,191,36,0.15); color: var(--yellow); border: 1px solid rgba(251,191,36,0.3); }
+    .flag-out      { background: rgba(74,222,128,0.15); color: var(--green);  border: 1px solid rgba(74,222,128,0.3); }
+    .flag-blocked  { background: rgba(167,139,250,0.15); color: var(--purple); border: 1px solid rgba(167,139,250,0.3); }
+
+    /* Middle: metrics */
+    .prop-metrics {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+    .prop-metrics .pacing-strip {
+      grid-column: 1 / -1;
+      margin-top: 0;
+    }
+    .metric-box {
+      background: var(--navy);
+      border: 1px solid var(--navy-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+    }
+    .metric-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .metric-value { font-size: 18px; font-weight: 700; line-height: 1; }
+    .metric-sub   { font-size: 10px; color: var(--muted); margin-top: 3px; }
+    .mv-good   { color: var(--green); }
+    .mv-warn   { color: var(--yellow); }
+    .mv-bad    { color: var(--red); }
+    .mv-gold   { color: var(--gold); }
+    .mv-muted  { color: var(--muted); }
+    .occ-bar { height: 4px; border-radius: 2px; background: var(--navy-border); margin-top: 6px; overflow: hidden; }
+    .occ-fill { height: 100%; border-radius: 2px; }
+
+    /* ── Pacing strip ── */
+    .pacing-strip {
+      background: var(--navy);
+      border: 1px solid var(--navy-border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-top: 10px;
+      grid-column: 1 / -1;
+    }
+    .pacing-header {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em;
+      color: var(--muted); margin-bottom: 8px; font-weight: 600;
+    }
+    .pacing-windows {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+    }
+    .pacing-window { }
+    .pacing-label {
+      font-size: 10px; color: var(--muted); margin-bottom: 4px;
+      display: flex; justify-content: space-between; align-items: baseline;
+    }
+    .pacing-pct {
+      font-size: 13px; font-weight: 700; line-height: 1; margin-bottom: 4px;
+    }
+    .pacing-track {
+      position: relative; height: 8px; border-radius: 4px;
+      background: var(--navy-border); overflow: visible; margin-bottom: 3px;
+    }
+    .pacing-prop-bar {
+      height: 100%; border-radius: 4px;
+      transition: width 0.4s ease;
+    }
+    .pacing-market-tick {
+      position: absolute; top: -2px; bottom: -2px;
+      width: 2px; border-radius: 1px;
+      background: rgba(201,169,110,0.6);
+    }
+    .pacing-vs {
+      font-size: 10px; color: var(--muted);
+    }
+    .pacing-vs .above { color: var(--green); }
+    .pacing-vs .below { color: var(--red); }
+
+    /* Right: AI recommendation */
+    .prop-rec {
+      background: linear-gradient(135deg, rgba(201,169,110,0.06) 0%, rgba(201,169,110,0.02) 100%);
+      border: 1px solid rgba(201,169,110,0.2);
+      border-radius: 12px;
+      padding: 14px 16px;
+      position: relative;
+    }
+    .rec-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .rec-label {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--gold); font-weight: 600;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .copy-btn {
+      background: rgba(201,169,110,0.12);
+      border: 1px solid rgba(201,169,110,0.25);
+      color: var(--gold); border-radius: 6px;
+      padding: 4px 10px; font-size: 11px; font-weight: 600;
+      cursor: pointer; transition: all 0.15s;
+      white-space: nowrap;
+    }
+    .copy-btn:hover { background: rgba(201,169,110,0.22); }
+    .copy-btn.copied { color: var(--green); border-color: rgba(74,222,128,0.3); background: rgba(74,222,128,0.1); }
+    .rec-text {
+      font-size: 13px; color: var(--text); line-height: 1.6;
+    }
+
+    /* ── Loading / Error ── */
+    .loading {
+      display: flex; align-items: center; justify-content: center;
+      padding: 80px; gap: 14px; color: var(--muted);
+      font-size: 15px;
+    }
+    .spinner {
+      width: 26px; height: 26px;
+      border: 2px solid var(--navy-border);
+      border-top-color: var(--gold);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error-card {
+      background: rgba(248,113,113,0.08);
+      border: 1px solid rgba(248,113,113,0.25);
+      border-radius: 10px; padding: 16px 20px;
+      color: var(--red); margin-bottom: 20px;
+    }
+
+    @media (max-width: 1100px) {
+      .prop-card { grid-template-columns: 220px 1fr; }
+      .prop-rec { grid-column: 1 / -1; }
+    }
+    @media (max-width: 760px) {
+      .kpi-row { grid-template-columns: repeat(2, 1fr); }
+      .prop-card { grid-template-columns: 1fr; }
+      .prop-metrics { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-mark">H</div>
+    <div class="brand-text">
+      <h1>Homeseeker Vacation Homes</h1>
+      <p>Revenue Manager · Active Portfolio</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <span class="last-sync" id="syncLabel"></span>
+    <button class="refresh-btn" id="refreshBtn" onclick="loadData()">↻ Refresh</button>
+  </div>
+</header>
+
+<div class="main">
+  <div id="errorCard" class="error-card" style="display:none;"></div>
+
+  <!-- KPI Row -->
+  <div class="kpi-row" id="kpiRow">
+    <div class="kpi-card" style="grid-column:1/-1;">
+      <div class="loading"><div class="spinner"></div> Loading portfolio data…</div>
+    </div>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls" id="controls" style="display:none;">
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="searchInput" placeholder="Search property or city…" oninput="renderCards()">
+    </div>
+    <select id="cityFilter" onchange="renderCards()">
+      <option value="">All Cities</option>
+    </select>
+    <div class="flag-filter" id="flagFilter">
+      <span class="flag-chip flag-dead"    data-flag="dead"        onclick="toggleFlag(this)">☠ Dead Calendar</span>
+      <span class="flag-chip flag-overpriced" data-flag="overpriced" onclick="toggleFlag(this)">↑ Overpriced</span>
+      <span class="flag-chip flag-underpriced" data-flag="underpriced" onclick="toggleFlag(this)">↓ Underpriced</span>
+      <span class="flag-chip flag-lag"     data-flag="lag"         onclick="toggleFlag(this)">⏳ Occ Lag</span>
+      <span class="flag-chip flag-out"     data-flag="outperformer" onclick="toggleFlag(this)">★ Outperformer</span>
+    </div>
+    <span class="results-count" id="resultsCount"></span>
+  </div>
+
+  <!-- Cards -->
+  <div class="property-grid" id="propertyGrid"></div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// CONSTANTS & UTILITIES
+// ─────────────────────────────────────────────────────────────
+const API_PROXY  = '/api/pricelabs';
+const API_DIRECT = 'https://api.pricelabs.co/v1/listings';
+const API_KEY    = 'd1z1lA1vbZYsVWaPJ2Kg2iwc8yBtzDGXZnD0cUvc';
+let portfolio = [];
+let activeFlags = new Set();
+
+const fmt$ = (n, decimals=0) => isNaN(n) || n===null ? '—' :
+  '$' + parseFloat(n).toLocaleString('en-CA', {maximumFractionDigits: decimals});
+
+function parseOcc(s) {
+  if (!s || s === '-') return null;
+  const n = parseInt(String(s).replace('%','').trim(), 10);
+  return isNaN(n) ? null : n;
+}
+
+function parseNum(v) {
+  if (v === null || v === undefined || v === '-' || v === 'Fully Blocked') return null;
+  const n = parseFloat(v);
+  return isNaN(n) ? null : n;
+}
+
+function daysSince(dateStr) {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    return Math.floor((Date.now() - d.getTime()) / 86400000);
+  } catch { return null; }
+}
+
+function isFullyBlocked(l) {
+  return parseOcc(l.occupancy_next_7) === 0 && parseOcc(l.occupancy_next_30) === 0 &&
+         parseOcc(l.occupancy_next_60) === 0 && parseOcc(l.occupancy_next_90) === 0 &&
+         (parseNum(l.mpi_next_30) === 0 || parseNum(l.mpi_next_30) === null);
+}
+
+// ─────────────────────────────────────────────────────────────
+// HEALTH SCORE (0–100, higher = worse)
+// ─────────────────────────────────────────────────────────────
+function computeHealthScore(l, portfolioAvgRevPAR) {
+  const occ30   = parseOcc(l.occupancy_next_30) ?? 50;
+  const mpi     = parseNum(l.mpi_next_30) ?? 1.0;
+  const revpar  = parseNum(l.revpar_next_30);
+  const ds      = daysSince(l.last_booked_date);
+  const isBlocked = l.revpar_next_30 === 'Fully Blocked';
+
+  // Occupancy component: 0–30 pts, lower occ = higher score
+  const occScore = ((100 - occ30) / 100) * 30;
+
+  // Days since last booking: 0–25 pts
+  let daysScore;
+  if (ds === null)          daysScore = 22;      // never booked
+  else if (ds >= 60)        daysScore = 25;
+  else                      daysScore = (ds / 60) * 25;
+
+  // MPI: 0–25 pts (only penalise underperformers < 1.0)
+  const mpiScore = mpi < 1.0 && mpi > 0 ? (1.0 - mpi) * 25 : 0;
+
+  // RevPAR vs portfolio avg: 0–20 pts
+  let revparScore = 0;
+  if (isBlocked) {
+    revparScore = 0;                              // booked out ≠ bad
+  } else if (revpar !== null && revpar > 0 && portfolioAvgRevPAR > 0) {
+    if (revpar < portfolioAvgRevPAR) {
+      revparScore = ((portfolioAvgRevPAR - revpar) / portfolioAvgRevPAR) * 20;
+    }
+  } else {
+    revparScore = 10;                             // unknown → mid penalty
+  }
+
+  const total = occScore + daysScore + mpiScore + revparScore;
+  return Math.min(100, Math.round(total));
+}
+
+// ─────────────────────────────────────────────────────────────
+// INTERVENTION FLAGS
+// ─────────────────────────────────────────────────────────────
+function computeFlags(l, top20RevPAR) {
+  const flags = [];
+  const occ30 = parseOcc(l.occupancy_next_30);
+  const mpi   = parseNum(l.mpi_next_30);
+  const ds    = daysSince(l.last_booked_date);
+  const revpar = parseNum(l.revpar_next_30);
+  const isBlocked = l.revpar_next_30 === 'Fully Blocked';
+  const calendarBlocked = isFullyBlocked(l);
+
+  if (calendarBlocked) {
+    flags.push('fully_blocked');
+    return flags;
+  }
+
+  // Dead Calendar: no booking in 14+ days (or never booked)
+  if (ds === null || ds >= 14) flags.push('dead');
+
+  // Overpriced: MPI > 1.15 + occ30 < 50%
+  if (mpi !== null && mpi > 1.15 && occ30 !== null && occ30 < 50) flags.push('overpriced');
+
+  // Underpriced: MPI < 0.85 + occ30 > 70%
+  if (mpi !== null && mpi < 0.85 && occ30 !== null && occ30 > 70) flags.push('underpriced');
+
+  // Occupancy Lag: occ30 < 40%
+  if (occ30 !== null && occ30 < 40 && !isBlocked) flags.push('lag');
+
+  // Outperformer: top 20% RevPAR
+  if (revpar !== null && revpar >= top20RevPAR && revpar > 0) flags.push('outperformer');
+
+  return flags;
+}
+
+// ─────────────────────────────────────────────────────────────
+// AI RECOMMENDATION ENGINE
+// ─────────────────────────────────────────────────────────────
+function generateRec(l, flags, score, portfolioAvgRevPAR) {
+  const name   = l.name.split(/[-–,]/)[0].trim();
+  const occ30  = parseOcc(l.occupancy_next_30);
+  const occ7   = parseOcc(l.occupancy_next_7);
+  const mpi    = parseNum(l.mpi_next_30);
+  const revpar = parseNum(l.revpar_next_30);
+  const ytd    = parseNum(l.revenue_ytd);
+  const ds     = daysSince(l.last_booked_date);
+  const base   = l.base;
+  const minP   = l.min;
+  const maxP   = l.max;
+  const isBlocked = l.revpar_next_30 === 'Fully Blocked';
+
+  if (flags.includes('fully_blocked')) {
+    return `This property's calendar shows 0% availability across all windows — all dates appear manually blocked or the listing is inactive. Verify with the owner whether this is intentional; if the property is available, re-enable the calendar immediately as you are losing bookable nights. Once unblocked, review the base price relative to comps before relaunching.`;
+  }
+
+  if (flags.includes('outperformer') && flags.length === 1) {
+    const pct = portfolioAvgRevPAR > 0 ? Math.round((revpar / portfolioAvgRevPAR - 1) * 100) : null;
+    return `${name} is a top-20% performer${pct ? ` with RevPAR ${pct}% above portfolio average` : ''} — strong signal to push rates. Test a 5–10% price increase on upcoming weekends and holidays without adjusting minimum stays, then monitor booking pace over 7 days. If pickup holds, make the increase permanent and consider extending it to shoulder dates.`;
+  }
+
+  if (flags.includes('dead') && flags.includes('overpriced')) {
+    const dsStr = ds !== null ? `${ds} days` : 'an extended period';
+    const cutPct = base ? `Reduce base price by 15–20% (to ~$${Math.round(base * 0.83)})` : 'Reduce base price by 15–20%';
+    return `No bookings for ${dsStr} while MPI of ${mpi?.toFixed(1)} signals guests are converting on comparable listings — a classic pricing blockage. ${cutPct} and open a 21-day promotional window to break the drought; once a booking lands, reassess and restore price in stages. Also review minimum-stay rules, as reducing from 3 nights to 2 can unlock mid-week demand.`;
+  }
+
+  if (flags.includes('dead') && flags.includes('lag')) {
+    const dsStr = ds !== null ? `${ds} days` : 'a long time';
+    return `${name} has been dark for ${dsStr} with only ${occ30}% occupancy in the next 30 days — this needs immediate triage. Check whether push-pricing is enabled and that the listing is visible on all connected channels; a photo refresh and title update often re-trigger algorithmic boosts. If visibility is confirmed, introduce a limited-time discount of 10–15% on the next 14 days to generate social proof through reviews.`;
+  }
+
+  if (flags.includes('dead')) {
+    const dsStr = ds !== null ? `${ds} days` : 'an extended period';
+    return `No confirmed booking in ${dsStr} is an early warning even with ${occ30}% calendar fill — verify the booking source and ensure no channel sync issues are silently blocking reservations. Run a competitive audit on Airbnb/VRBO for similar properties in ${l.city_name || 'this market'} to check if photos and pricing are aligned. Consider a short-term last-minute discount (10%) on the nearest open weekend to test demand.`;
+  }
+
+  if (flags.includes('overpriced')) {
+    const suggestedBase = base ? `~$${Math.round(base * 0.88)}` : 'lower';
+    return `MPI of ${mpi?.toFixed(1)} with ${occ30}% occupancy confirms the listing is priced above what the current market will bear. Bring the base price down to ${suggestedBase} and set a minimum near $${minP || Math.round((base||200)*0.7)} to stay competitive on off-peak nights without eroding peak revenue. Reassess after 14 days of improved pickup.`;
+  }
+
+  if (flags.includes('underpriced')) {
+    const suggestedMax = maxP ? `cap at $${maxP}` : 'extend your max ceiling';
+    return `With ${occ30}% occupancy and MPI of ${mpi?.toFixed(1)}, demand is outpacing supply — the market is willing to pay more. Raise the base price by 10–15%${base ? ` (from $${base} to ~$${Math.round(base * 1.12)})` : ''} and ${suggestedMax} to capture peak-period upside. Tighten minimum stays to 2–3 nights on weekends to prevent cheap short fills that block higher-value bookings.`;
+  }
+
+  if (flags.includes('lag')) {
+    return `At ${occ30}% occupancy over the next 30 days, ${name} is trailing market pace. Drop the gap-fill price threshold to 20% below base for stays under 3 nights to capture last-minute bookers, and check if any date gaps (1-night holes) are blocking demand. A refreshed hero photo or a response-rate improvement to under 1 hour can also meaningfully lift search ranking in ${l.city_name || 'this market'}.`;
+  }
+
+  if (flags.includes('outperformer')) {
+    return `Strong performer with ${occ30}% occupancy — monitor closely to avoid leaving revenue on the table. Push weekend and holiday rates 8–12% above current base${base ? ` ($${Math.round(base*1.1)})` : ''} and test a dynamic max ceiling. Maintain current minimum-stay rules which appear to be working well.`;
+  }
+
+  if (isBlocked) {
+    const ytdStr = ytd && ytd > 0 ? `YTD revenue is $${ytd.toLocaleString('en-CA')}` : 'no YTD revenue recorded yet';
+    return `Calendar is fully booked through the window — excellent short-term position. ${ytdStr}; with ${occ30}% occupancy, consider raising rates on any remaining open dates beyond 90 days to maximise the revenue-per-available-night floor. Ensure future months have competitive pricing loaded before the current block period ends.`;
+  }
+
+  // Generic fallback
+  const scoreLabel = score >= 70 ? 'critical attention' : score >= 45 ? 'monitoring' : 'stable management';
+  return `${name} currently rates ${score}/100 on the health index — ${scoreLabel} recommended. Review pricing against comparable active listings in ${l.city_name || 'this market'} and confirm the listing is actively syncing to all booking channels. A weekly check on booking pickup velocity (aim for 2+ bookings per 30-day window) will help catch emerging issues early.`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// RENDER KPIs
+// ─────────────────────────────────────────────────────────────
+function renderKPIs(listings) {
+  const avgOcc = listings.filter(l => parseOcc(l.occupancy_next_30) !== null)
+    .reduce((s,l,_,a) => s + parseOcc(l.occupancy_next_30) / a.length, 0);
+  const totalRev30 = listings.reduce((s,l) => s + (parseNum(l.revenue_next_30) || 0), 0);
+  const totalYTD   = listings.reduce((s,l) => s + (parseNum(l.revenue_ytd) || 0), 0);
+  const needsAttn  = listings.filter(l => {
+    const f = l._flags || [];
+    return f.includes('dead') || f.includes('overpriced') || f.includes('lag');
+  }).length;
+
+  const occColor = avgOcc >= 60 ? 'kpi-green' : avgOcc >= 35 ? 'kpi-gold' : 'kpi-red';
+  const attnColor = needsAttn >= 10 ? 'kpi-red' : needsAttn >= 5 ? 'kpi-gold' : 'kpi-green';
+
+  document.getElementById('kpiRow').innerHTML = `
+    <div class="kpi-card">
+      <div class="kpi-label">Portfolio Avg Occupancy (30d)</div>
+      <div class="kpi-value ${occColor}">${avgOcc.toFixed(0)}%</div>
+      <div class="kpi-sub">${listings.length} active properties</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Total Revenue Next 30d</div>
+      <div class="kpi-value kpi-gold">${fmt$(totalRev30)}</div>
+      <div class="kpi-sub">CAD projected</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Total YTD Revenue</div>
+      <div class="kpi-value kpi-blue">${fmt$(totalYTD)}</div>
+      <div class="kpi-sub">CAD year-to-date</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Properties Needing Attention</div>
+      <div class="kpi-value ${attnColor}">${needsAttn}</div>
+      <div class="kpi-sub">Dead calendar, overpriced, or occ lag</div>
+    </div>
+  `;
+}
+
+// ─────────────────────────────────────────────────────────────
+// SCORE RING SVG
+// ─────────────────────────────────────────────────────────────
+function scoreRingSVG(score) {
+  const r = 20, c = 26;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (score / 100) * circ;
+  let color = '#4ade80';
+  if (score >= 70) color = '#f87171';
+  else if (score >= 45) color = '#fb923c';
+  else if (score >= 25) color = '#fbbf24';
+  return `<svg width="52" height="52" viewBox="0 0 52 52">
+    <circle class="score-ring-track" cx="${c}" cy="${c}" r="${r}"/>
+    <circle class="score-ring-fill" cx="${c}" cy="${c}" r="${r}"
+      stroke="${color}"
+      stroke-dasharray="${circ.toFixed(2)}"
+      stroke-dashoffset="${offset.toFixed(2)}"
+      transform="rotate(-90 ${c} ${c})"/>
+    <text x="${c}" y="${c+1}" text-anchor="middle" dominant-baseline="middle"
+      fill="${color}" font-size="12" font-weight="800" transform="rotate(0)">${score}</text>
+  </svg>`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// PACING WINDOW CELL
+// ─────────────────────────────────────────────────────────────
+function pacingCell(label, prop, market) {
+  const p = prop ?? 0;
+  const barColor = p >= 70 ? 'var(--green)' : p >= 40 ? 'var(--yellow)' : p > 0 ? 'var(--red)' : 'var(--navy-border)';
+  const tickPos  = market !== null ? Math.min(market, 100) : null;
+  const diff     = (prop !== null && market !== null) ? prop - market : null;
+  const diffHTML = diff !== null
+    ? `<span class="${diff >= 0 ? 'above' : 'below'}">${diff >= 0 ? '+' : ''}${diff}%</span> vs mkt`
+    : '<span>—</span>';
+  return `
+    <div class="pacing-window">
+      <div class="pacing-label"><span>${label}</span></div>
+      <div class="pacing-pct" style="color:${barColor}">${prop !== null ? prop + '%' : '—'}</div>
+      <div class="pacing-track">
+        <div class="pacing-prop-bar" style="width:${p}%;background:${barColor}"></div>
+        ${tickPos !== null ? `<div class="pacing-market-tick" style="left:${tickPos}%"></div>` : ''}
+      </div>
+      <div class="pacing-vs">${diffHTML}</div>
+    </div>`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// STLY DELTA BADGE  e.g. "▲ 12% vs LY" or "▼ 8% vs LY"
+// ─────────────────────────────────────────────────────────────
+function stlyBadge(current, stly) {
+  if (current === null || stly === null || stly === 0) return '';
+  const pct = Math.round(((current - stly) / stly) * 100);
+  if (isNaN(pct)) return '';
+  const up = pct >= 0;
+  const color = up ? 'var(--green)' : 'var(--red)';
+  const arrow = up ? '▲' : '▼';
+  const sign  = up ? '+' : '';
+  return `<span style="font-size:10px;color:${color};margin-left:4px;white-space:nowrap">${arrow} ${sign}${pct}% vs LY</span>`;
+}
+
+function stlySub(label, stlyVal) {
+  if (stlyVal === null || stlyVal === 0) return `<span style="color:var(--muted)">LY: —</span>`;
+  return `<span style="color:var(--muted)">LY: ${fmt$(stlyVal)}</span>`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// RENDER CARDS
+// ─────────────────────────────────────────────────────────────
+function renderCards() {
+  const search = document.getElementById('searchInput').value.toLowerCase();
+  const city   = document.getElementById('cityFilter').value;
+
+  let filtered = portfolio.filter(l => {
+    const name = (l.name || '').toLowerCase();
+    const cityN = (l.city_name || '').toLowerCase();
+    if (search && !name.includes(search) && !cityN.includes(search)) return false;
+    if (city && l.city_name !== city) return false;
+    if (activeFlags.size > 0) {
+      const hasFlag = [...activeFlags].some(f => l._flags.includes(f));
+      if (!hasFlag) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('resultsCount').textContent =
+    `${filtered.length} of ${portfolio.length} properties`;
+
+  const grid = document.getElementById('propertyGrid');
+  if (!filtered.length) {
+    grid.innerHTML = `<div style="text-align:center;padding:60px;color:var(--muted)">No properties match your filters.</div>`;
+    return;
+  }
+
+  grid.innerHTML = filtered.map(l => {
+    const score  = l._score;
+    const flags  = l._flags;
+    const occ30  = parseOcc(l.occupancy_next_30);
+    const occ7   = parseOcc(l.occupancy_next_7);
+    const occ90  = parseOcc(l.occupancy_next_90);
+    const mpi    = parseNum(l.mpi_next_30);
+    const mpi60  = parseNum(l.mpi_next_60);
+    const revpar      = parseNum(l.revpar_next_30);
+    const rev30       = parseNum(l.revenue_next_30);
+    const ytd         = parseNum(l.revenue_ytd);
+    const stlyRevpar  = parseNum(l.stly_revpar_next_30);
+    const stlyRev30   = parseNum(l.stly_revenue_next_30);
+    const stlyYtd     = parseNum(l.stly_revenue_ytd);
+    const ds          = daysSince(l.last_booked_date);
+    const mocc7  = parseOcc(l.market_occupancy_next_7);
+    const mocc30 = parseOcc(l.market_occupancy_next_30);
+    const mocc60 = parseOcc(l.market_occupancy_next_60);
+    const mocc90 = parseOcc(l.market_occupancy_next_90);
+    const occ60  = parseOcc(l.occupancy_next_60);
+    const isBlocked = l.revpar_next_30 === 'Fully Blocked';
+
+    const cardClass = score >= 70 ? 'critical' : score >= 40 ? 'warning' : 'good';
+    const scoreDesc = score >= 70 ? 'Needs urgent attention'
+                    : score >= 45 ? 'Monitor closely'
+                    : score >= 25 ? 'Performing OK'
+                    : 'Strong performer';
+
+    // Flag badges HTML
+    const flagHTML = flags.map(f => {
+      const map = {
+        dead:         `<span class="flag-tag flag-dead">☠ Dead Calendar</span>`,
+        overpriced:   `<span class="flag-tag flag-overpriced">↑ Overpriced</span>`,
+        underpriced:  `<span class="flag-tag flag-underpriced">↓ Underpriced</span>`,
+        lag:          `<span class="flag-tag flag-lag">⏳ Occ Lag</span>`,
+        outperformer: `<span class="flag-tag flag-out">★ Outperformer</span>`,
+        fully_blocked:`<span class="flag-tag flag-blocked">⬛ Fully Blocked</span>`,
+      };
+      return map[f] || '';
+    }).join('');
+
+    // Metric colours
+    const occColor = occ30 === null ? 'mv-muted' : occ30 >= 70 ? 'mv-good' : occ30 >= 40 ? 'mv-warn' : 'mv-bad';
+    const mpiColor = mpi === null ? 'mv-muted' : mpi >= 1.5 ? 'mv-good' : mpi >= 0.85 ? 'mv-warn' : 'mv-bad';
+    const revparColor = revpar === null ? 'mv-muted' : revpar >= 100 ? 'mv-good' : revpar >= 50 ? 'mv-warn' : 'mv-bad';
+    const dsColor = ds === null ? 'mv-bad' : ds <= 7 ? 'mv-good' : ds <= 14 ? 'mv-warn' : 'mv-bad';
+
+    // RevPAR display
+    const revparDisplay = isBlocked ? `<span class="mv-good" style="font-size:13px">Fully Booked</span>`
+                        : revpar !== null && revpar > 0 ? `<span class="${revparColor}">${fmt$(revpar)}</span>`
+                        : '<span class="mv-muted">—</span>';
+
+    // Days since display
+    const dsDisplay = ds === null ? `<span class="mv-bad">Never</span>`
+                    : `<span class="${dsColor}">${ds}d ago</span>`;
+
+    // MPI display with delta arrow
+    let mpiDisplay = '<span class="mv-muted">—</span>';
+    if (mpi !== null) {
+      const mpiDelta = ((mpi - 1.0) * 100).toFixed(0);
+      const sign = mpiDelta >= 0 ? '+' : '';
+      mpiDisplay = `<span class="${mpiColor}">${mpi.toFixed(1)}</span><span style="font-size:10px;color:var(--muted);margin-left:3px">(${sign}${mpiDelta}%)</span>`;
+    }
+
+    const rec = l._rec;
+
+    return `
+      <div class="prop-card ${cardClass}" id="card-${l.id}">
+
+        <!-- LEFT: identity + score -->
+        <div class="prop-identity">
+          <div class="prop-name">${l.name}</div>
+          <div class="prop-location">📍 ${l.city_name || '—'}${l.no_of_bedrooms ? ` · ${l.no_of_bedrooms} bed` : ''}</div>
+          <div class="health-score-row">
+            <div class="score-ring">${scoreRingSVG(score)}</div>
+            <div class="score-label-wrap">
+              <div class="score-number" style="color:${score>=70?'var(--red)':score>=45?'var(--orange)':score>=25?'var(--yellow)':'var(--green)'}">${score}<span style="font-size:12px;font-weight:400;color:var(--muted)">/100</span></div>
+              <div class="score-desc">${scoreDesc}</div>
+            </div>
+          </div>
+          <div class="flag-tags">${flagHTML || '<span style="font-size:11px;color:var(--muted)">No flags</span>'}</div>
+        </div>
+
+        <!-- MIDDLE: metrics -->
+        <div class="prop-metrics">
+          <div class="metric-box">
+            <div class="metric-label">Occ 30d</div>
+            <div class="metric-value ${occColor}">${occ30 !== null ? occ30 + '%' : '—'}</div>
+            <div class="occ-bar"><div class="occ-fill" style="width:${occ30||0}%;background:${occ30>=70?'var(--green)':occ30>=40?'var(--yellow)':'var(--red)'}"></div></div>
+            <div class="metric-sub">7d: ${occ7 !== null ? occ7+'%' : '—'} · 90d: ${occ90 !== null ? occ90+'%' : '—'}</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">MPI (30d)</div>
+            <div class="metric-value">${mpiDisplay}</div>
+            <div class="metric-sub">60d: ${mpi60 !== null ? mpi60.toFixed(1) : '—'}</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">RevPAR${stlyRevpar !== null ? stlyBadge(revpar, stlyRevpar) : ''}</div>
+            <div class="metric-value">${revparDisplay}</div>
+            <div class="metric-sub">Next 30d · ${stlySub('LY', stlyRevpar)}</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Rev Next 30d${stlyRev30 !== null ? stlyBadge(rev30, stlyRev30) : ''}</div>
+            <div class="metric-value mv-gold">${rev30 !== null && rev30 > 0 ? fmt$(rev30) : isBlocked ? '<span style="font-size:13px">See RevPAR</span>' : '<span class="mv-muted">—</span>'}</div>
+            <div class="metric-sub">${stlySub('LY', stlyRev30)}</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">YTD Revenue${stlyYtd !== null ? stlyBadge(ytd, stlyYtd) : ''}</div>
+            <div class="metric-value mv-blue">${ytd !== null && ytd > 0 ? fmt$(ytd) : '<span class="mv-muted">$0</span>'}</div>
+            <div class="metric-sub">${stlySub('LY', stlyYtd)}</div>
+          </div>
+          <div class="metric-box">
+            <div class="metric-label">Last Booked</div>
+            <div class="metric-value" style="font-size:14px">${dsDisplay}</div>
+            <div class="metric-sub">Price: ${l.min ? '$'+l.min : '—'} · $${l.base||'—'} · ${l.max ? '$'+l.max : '—'}</div>
+          </div>
+          <div class="pacing-strip">
+            <div class="pacing-header">Occupancy Pacing <span style="color:rgba(201,169,110,0.6);font-size:9px;margin-left:6px">│ gold tick = market</span></div>
+            <div class="pacing-windows">
+              ${pacingCell('7 days',  occ7,  mocc7)}
+              ${pacingCell('30 days', occ30, mocc30)}
+              ${pacingCell('60 days', occ60, mocc60)}
+              ${pacingCell('90 days', occ90, mocc90)}
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT: AI rec -->
+        <div class="prop-rec">
+          <div class="rec-header">
+            <span class="rec-label">✦ AI Recommendation</span>
+            <button class="copy-btn" onclick="copyRec(this, '${l.id}')">Copy</button>
+          </div>
+          <div class="rec-text" id="rec-${l.id}">${rec}</div>
+        </div>
+
+      </div>
+    `;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// COPY BUTTON
+// ─────────────────────────────────────────────────────────────
+function copyRec(btn, id) {
+  const text = document.getElementById('rec-' + id)?.textContent || '';
+  navigator.clipboard.writeText(text).then(() => {
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy'; btn.classList.remove('copied'); }, 2000);
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// FLAG FILTER TOGGLE
+// ─────────────────────────────────────────────────────────────
+function toggleFlag(chip) {
+  const flag = chip.dataset.flag;
+  if (activeFlags.has(flag)) { activeFlags.delete(flag); chip.classList.remove('active'); }
+  else                        { activeFlags.add(flag);    chip.classList.add('active'); }
+  renderCards();
+}
+
+// ─────────────────────────────────────────────────────────────
+// POPULATE CITY FILTER
+// ─────────────────────────────────────────────────────────────
+function populateCityFilter(listings) {
+  const cities = [...new Set(listings.map(l => l.city_name).filter(Boolean))].sort();
+  document.getElementById('cityFilter').innerHTML =
+    '<option value="">All Cities</option>' +
+    cities.map(c => `<option value="${c}">${c}</option>`).join('');
+}
+
+// ─────────────────────────────────────────────────────────────
+// LOAD DATA
+// ─────────────────────────────────────────────────────────────
+async function loadData() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  btn.textContent = '↻ Loading…';
+  document.getElementById('errorCard').style.display = 'none';
+  document.getElementById('propertyGrid').innerHTML = '';
+  document.getElementById('kpiRow').innerHTML = `<div class="kpi-card" style="grid-column:1/-1;"><div class="loading"><div class="spinner"></div> Loading portfolio data…</div></div>`;
+  document.getElementById('controls').style.display = 'none';
+
+  try {
+    // Try local proxy first (dev), fall back to direct API (GitHub Pages)
+    let resp = await fetch(API_PROXY).catch(() => null);
+    if (!resp || !resp.ok) {
+      resp = await fetch(API_DIRECT, { headers: { 'X-API-Key': API_KEY } });
+    }
+    if (!resp.ok) throw new Error(`API ${resp.status}: ${resp.statusText}`);
+    const data = await resp.json();
+
+    const active = (data.listings || []).filter(l => l.tags === 'active');
+
+    // Compute portfolio averages for scoring
+    const revpars = active.map(l => parseNum(l.revpar_next_30)).filter(v => v !== null && v > 0);
+    const portfolioAvgRevPAR = revpars.length ? revpars.reduce((a,b)=>a+b,0) / revpars.length : 0;
+    revpars.sort((a,b)=>a-b);
+    const top20Idx = Math.floor(revpars.length * 0.8);
+    const top20RevPAR = revpars[top20Idx] ?? 0;
+
+    // Annotate each listing
+    active.forEach(l => {
+      l._score = computeHealthScore(l, portfolioAvgRevPAR);
+      l._flags = computeFlags(l, top20RevPAR);
+      l._rec   = generateRec(l, l._flags, l._score, portfolioAvgRevPAR);
+    });
+
+    // Sort by health score descending (worst first)
+    active.sort((a, b) => b._score - a._score);
+
+    portfolio = active;
+
+    renderKPIs(active);
+    populateCityFilter(active);
+    document.getElementById('controls').style.display = 'flex';
+    renderCards();
+
+    document.getElementById('syncLabel').textContent =
+      `Synced ${new Date().toLocaleTimeString('en-CA', {hour:'2-digit',minute:'2-digit'})}`;
+
+  } catch (err) {
+    document.getElementById('errorCard').style.display = 'block';
+    document.getElementById('errorCard').textContent = `Failed to load: ${err.message}`;
+    document.getElementById('kpiRow').innerHTML = '';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '↻ Refresh';
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>
